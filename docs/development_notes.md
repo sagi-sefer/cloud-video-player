@@ -2,11 +2,12 @@
 
 ## 1. Dropbox Authentication & App ID Setup
 * Configured via `DROPBOX_VIDEO_APP_KEY=...` in `local.properties`, injected at compile time via Gradle `BuildConfig.DROPBOX_VIDEO_APP_KEY`.
-* OAuth redirect scheme: `cloudvideoplayer://oauth`.
+* OAuth redirect scheme: `cloudvideoplayer://oauth`. Handled in `MainActivity`.
 
 ## 2. Technical Implementation Highlights
-* **Media3 ExoPlayer Video Rendering**: Utilizes `PlayerView` and `ExoPlayer` with `TrackSelectionParameters` for audio and subtitle track switching.
-* **External Subtitles**: Parses `.srt` and `.vtt` sidecar subtitle files from Dropbox folder responses.
-* **Local Playback Resume**: Room database tracks playback position per video ID.
-* **Orientation Toggle**: Dynamic Activity orientation switching between portrait and landscape modes.
-* **Android TV**: Leanback launcher intent and `androidx.tv` focus management.
+* **Domain & Clean Architecture**: Fully structured into `domain`, `application`, `infrastructure`, and `presentation` packages with Hilt dependency injection.
+* **Dropbox Integration**: `DropboxStorageRepositoryImpl` queries Dropbox v2 files, folder contents, temporary stream links, and external `.srt`/`.vtt` subtitles.
+* **Room Database**: Persists last known playback positions (`PlaybackProgressEntity`, `PlaybackProgressDao`, `CloudVideoDatabase`).
+* **Media3 ExoPlayer Video Rendering**: Utilizes `ExoPlayerManager` and `PlayerView` with multi-format video streaming and external subtitle configuration.
+* **Presentation & Rotation**: Supports vertical detail view with dynamic orientation toggling to landscape full-screen player with 5-second auto-hide controls, gradient scrims, and resume prompt dialog.
+* **Android TV**: `TvLibraryScreen` built with Jetpack Compose for TV (`androidx.tv`) and Leanback launcher integration.
