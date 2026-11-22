@@ -19,7 +19,6 @@ import javax.inject.Singleton
 object DropboxModule {
 
     private const val PREFS_NAME = "cloud_video_prefs"
-    private const val KEY_ACCESS_TOKEN = "dropbox_access_token"
 
     @Provides
     @Singleton
@@ -35,23 +34,8 @@ object DropboxModule {
 
     @Provides
     @Singleton
-    fun provideDropboxClientProvider(
-        prefs: SharedPreferences,
-        requestConfig: DbxRequestConfig
-    ): () -> DbxClientV2? = {
-        val token = prefs.getString(KEY_ACCESS_TOKEN, null)
-        if (!token.isNullOrBlank()) {
-            DbxClientV2(requestConfig, token)
-        } else {
-            // Fallback or empty if not authenticated yet
-            null
-        }
-    }
-
-    @Provides
-    @Singleton
     fun provideCloudStorageRepository(
-        clientProvider: () -> DbxClientV2?
+        clientProvider: com.example.cloudvideoplayer.infrastructure.dropbox.DropboxClientProvider
     ): CloudStorageRepository {
         return DropboxStorageRepositoryImpl(clientProvider)
     }

@@ -46,7 +46,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         Spacer(modifier = Modifier.height(32.dp))
         Button(
             onClick = {
-                val authUrl = "https://www.dropbox.com/oauth2/authorize?client_id=$appKey&response_type=token&redirect_uri=cloudvideoplayer://oauth"
+                val authUrl = "https://www.dropbox.com/oauth2/authorize?client_id=$appKey&response_type=token&redirect_uri=cloudvideoplayer://oauth&scope=files.metadata.read%20files.content.read"
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(authUrl))
                 context.startActivity(intent)
             }

@@ -1,12 +1,16 @@
 package com.example.cloudvideoplayer.domain.model
 
-sealed class MediaItem {
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
+sealed class MediaItem : Parcelable {
     abstract val id: String
     abstract val name: String
     abstract val path: String
     abstract val size: Long
     abstract val lastModified: Long
 
+    @Parcelize
     data class Folder(
         override val id: String,
         override val name: String,
@@ -16,6 +20,7 @@ sealed class MediaItem {
         val itemCount: Int = 0
     ) : MediaItem()
 
+    @Parcelize
     data class VideoItem(
         override val id: String,
         override val name: String,
@@ -29,7 +34,8 @@ sealed class MediaItem {
     ) : MediaItem()
 }
 
-enum class VideoFormat {
+@Parcelize
+enum class VideoFormat : Parcelable {
     MKV, MP4, WEBM, AVI, MOV, M4V, UNKNOWN;
 
     companion object {
@@ -48,13 +54,14 @@ enum class VideoFormat {
     }
 }
 
+@Parcelize
 data class SubtitleItem(
     val id: String,
     val name: String,
     val path: String,
     val downloadUrl: String,
     val language: String = "en"
-)
+) : Parcelable
 
 data class PlaybackProgress(
     val videoId: String,

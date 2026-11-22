@@ -2,11 +2,27 @@
 
 ## 1. Dropbox Authentication & App ID Setup
 * Configured via `DROPBOX_VIDEO_APP_KEY=...` in `local.properties`, injected at compile time via Gradle `BuildConfig.DROPBOX_VIDEO_APP_KEY`.
-* OAuth redirect scheme: `cloudvideoplayer://oauth`. Handled in `MainActivity`.
+* OAuth redirect scheme: `cloudvideoplayer://oauth` with explicit scopes (`files.metadata.read files.content.read`). Handled in `MainActivity`.
+* **Important Dropbox App Console Requirement**: In the [Dropbox App Console](https://www.dropbox.com/developers/apps), select your app (ID: `9492785`), go to the **Permissions** tab, and explicitly check/enable **`files.metadata.read`** and **`files.content.read`**, then click **Submit**. Without enabling these permissions in the Dropbox App Console, Dropbox will reject requests with "No scope requested can be granted for this app."
+* Scope and permission error handling automatically clears invalid tokens and redirects to `LoginScreen`.
 
-## 2. Technical Implementation Highlights
+## 2. Subtitle Selection & Troubleshooting
+* **External Subtitles (`.srt`, `.vtt`)**:
+  * Automatically discovered by `GetExternalSubtitlesUseCase` scanning the parent folder of the video in Dropbox.
+  * Must be placed in the **exact same Dropbox folder** as the video file.
+  * Loaded via temporary secure download links (`getTemporaryLink`).
+* **Emulator Network & SSL/TLS Considerations**:
+  * If testing on an **Android Emulator**, ensure the emulator has active internet access (test opening browser inside emulator).
+  * Ensure the emulator's system date and time are correctly synchronized with host/network; incorrect clock settings cause SSL handshake failures when fetching temporary links from Dropbox (`dl.dropboxusercontent.com`).
+* **Embedded Subtitles in MKV/MP4**:
+  * Extracted via Media3 ExoPlayer extractors (`DefaultExtractorsFactory` with text track transcoding enabled). Standard text subtitle streams (SubRip, WebVTT) are supported automatically. Complex bitmap subtitles (VobSub/PGS) or unsupported codecs may not render without hardware/decoder support.
+* **Track Detection Timing**:
+  * Subtitle tracks appear in the Settings dialog once ExoPlayer finishes preparing the media source and firing `onTracksChanged`. If opened immediately upon playback start, allow 1–2 seconds for track discovery.
+
+## 3. Technical Implementation Highlights
 * **Domain & Clean Architecture**: Fully structured into `domain`, `application`, `infrastructure`, and `presentation` packages with Hilt dependency injection.
-* **Dropbox Integration**: `DropboxStorageRepositoryImpl` queries Dropbox v2 files, folder contents, temporary stream links, and external `.srt`/`.vtt` subtitles.
+* **Dropbox Integration**: `DropboxStorageRepositoryImpl` queries Dropbox v2 files, folder contents, temporary stream links, and external `.srt`/`.vtt`.
+* **Home Folder Selection & Recursive Cataloging**: Allows users to set/save any Dropbox folder as their root video folder via the ⭐ button. Uses `CatalogVideosUseCase` and Dropbox API `withRecursive(true)` to recursively discover all videos across all subfolders and auto-open the cataloged **Video Grid Page** (`LibraryViewMode.GRID`). Includes view mode toggles between Video Grid and Folder Browser.
 * **Room Database**: Persists last known playback positions (`PlaybackProgressEntity`, `PlaybackProgressDao`, `CloudVideoDatabase`).
 * **Media3 ExoPlayer Video Rendering**: Utilizes `ExoPlayerManager` and `PlayerView` with multi-format video streaming and external subtitle configuration.
 * **Presentation & Rotation**: Supports vertical detail view with dynamic orientation toggling to landscape full-screen player with 5-second auto-hide controls, gradient scrims, and resume prompt dialog.

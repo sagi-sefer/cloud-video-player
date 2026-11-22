@@ -2,6 +2,7 @@ package com.example.cloudvideoplayer.presentation.ui
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -17,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Pause
@@ -68,14 +71,18 @@ fun PlayerScreen(
     val duration by viewModel.exoPlayerManager.duration.collectAsState()
 
     var showControls by remember { mutableStateOf(true) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
 
-    // Force Landscape during playback
+    // Load video once when videoId changes
+    LaunchedEffect(videoId) {
+        viewModel.loadVideo(videoId, videoPath, videoTitle)
+    }
+
+    // Force Landscape during playback and save progress on dispose
     DisposableEffect(Unit) {
         val activity = context as? Activity
         val originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-
-        viewModel.loadVideo(videoId, videoPath, videoTitle)
 
         onDispose {
             viewModel.saveProgress()
@@ -83,9 +90,9 @@ fun PlayerScreen(
         }
     }
 
-    // 5-second auto-hide controls timer
-    LaunchedEffect(showControls, isPlaying) {
-        if (showControls && isPlaying) {
+    // 5-second auto-hide controls timer (paused when settings dialog is open)
+    LaunchedEffect(showControls, isPlaying, showSettingsDialog) {
+        if (showControls && isPlaying && !showSettingsDialog) {
             delay(5000L)
             showControls = false
         }
@@ -103,7 +110,11 @@ fun PlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .clickable { showControls = !showControls }
+            .clickable {
+                if (!showSettingsDialog) {
+                    showControls = !showControls
+                }
+            }
     ) {
         when (val state = uiState) {
             is PlayerUiState.Loading -> {
@@ -123,6 +134,10 @@ fun PlayerScreen(
                         PlayerView(ctx).apply {
                             player = viewModel.exoPlayerManager.exoPlayer
                             useController = false
+                            subtitleView?.apply {
+                                setApplyEmbeddedStyles(true)
+                                setApplyEmbeddedFontSizes(true)
+                            }
                         }
                     },
                     modifier = Modifier.fillMaxSize()
@@ -181,7 +196,7 @@ fun PlayerScreen(
                                     }
                                     Text(text = state.videoTitle, color = Color.White, style = MaterialTheme.typography.titleMedium)
                                 }
-                                IconButton(onClick = { /* Open Subtitle / Audio Settings */ }) {
+                                IconButton(onClick = { showSettingsDialog = true }) {
                                     Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
                                 }
                             }
@@ -253,6 +268,88 @@ fun PlayerScreen(
                             }
                         }
                     }
+                }
+
+                // Audio & Subtitle Settings Dialog (scoped at PlayerScreen top-level)
+                if (showSettingsDialog) {
+                    val audioTracks = viewModel.exoPlayerManager.getAudioTracksInfo()
+                    val subtitleTracks = viewModel.exoPlayerManager.getSubtitleTracksInfo()
+                    val scrollState = rememberScrollState()
+
+                    AlertDialog(
+                        onDismissRequest = { showSettingsDialog = false },
+                        title = { Text("Audio & Subtitles") },
+                        text = {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(scrollState)
+                            ) {
+                                Text("Audio Tracks:", style = MaterialTheme.typography.titleSmall)
+                                if (audioTracks.isEmpty()) {
+                                    Text("No audio tracks available", style = MaterialTheme.typography.bodySmall)
+                                } else {
+                                    audioTracks.forEach { track ->
+                                        Button(
+                                            onClick = {
+                                                val success = viewModel.exoPlayerManager.selectTrack(track.groupIndex, track.trackIndex)
+                                                if (!success) {
+                                                    Toast.makeText(context, "Audio track '${track.name}' is not supported by device hardware decoder.", Toast.LENGTH_LONG).show()
+                                                } else {
+                                                    showSettingsDialog = false
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 2.dp)
+                                        ) {
+                                            Text("${if (track.isSelected) "✓ " else ""}${track.name}")
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text("Subtitle Tracks:", style = MaterialTheme.typography.titleSmall)
+                                Button(
+                                    onClick = {
+                                        viewModel.exoPlayerManager.setSubtitleEnabled(false)
+                                        showSettingsDialog = false
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 2.dp)
+                                ) {
+                                    Text("Off (Disable Subtitles)")
+                                }
+                                if (subtitleTracks.isEmpty()) {
+                                    Text("No subtitle tracks available", style = MaterialTheme.typography.bodySmall)
+                                } else {
+                                    subtitleTracks.forEach { track ->
+                                        Button(
+                                            onClick = {
+                                                val success = viewModel.exoPlayerManager.selectTrack(track.groupIndex, track.trackIndex)
+                                                if (!success) {
+                                                    Toast.makeText(context, "Subtitle '${track.name}' is not supported.", Toast.LENGTH_LONG).show()
+                                                } else {
+                                                    showSettingsDialog = false
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 2.dp)
+                                        ) {
+                                            Text("${if (track.isSelected) "✓ " else ""}${track.name}")
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            Button(onClick = { showSettingsDialog = false }) {
+                                Text("Close")
+                            }
+                        }
+                    )
                 }
             }
         }

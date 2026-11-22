@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,7 +48,7 @@ fun TvLibraryScreen(
                 text = "Cloud Video Player - TV Library",
                 style = androidx.tv.material3.MaterialTheme.typography.headlineLarge
             )
-            androidx.tv.material3.Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             when (val state = uiState) {
                 is LibraryUiState.Loading -> {
@@ -56,6 +57,7 @@ fun TvLibraryScreen(
                     }
                 }
                 is LibraryUiState.Success -> {
+                    val displayItems: List<MediaItem> = if (state.catalogedVideos.isNotEmpty()) state.catalogedVideos else state.items
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(4),
                         contentPadding = PaddingValues(16.dp),
@@ -63,7 +65,7 @@ fun TvLibraryScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(state.items) { item ->
+                        items(displayItems) { item ->
                             androidx.tv.material3.Card(
                                 onClick = { onItemClick(item) },
                                 modifier = Modifier

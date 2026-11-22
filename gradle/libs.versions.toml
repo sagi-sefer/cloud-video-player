@@ -14,8 +14,8 @@ coil = "2.7.0"
 dropboxCoreSdk = "7.0.0"
 agp = "8.7.0"
 kotlin = "2.0.20"
-tvFoundation = "1.0.0-alpha11"
-tvMaterial = "1.0.0-alpha11"
+tvFoundation = "1.0.0"
+tvMaterial = "1.0.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }

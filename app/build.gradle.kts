@@ -8,6 +8,8 @@ plugins {
     alias(libs.plugins.hilt.android)
 }
 
+apply(plugin = "kotlin-parcelize")
+
 android {
     namespace = "com.example.cloudvideoplayer"
     compileSdk = 35

@@ -76,6 +76,7 @@ class MainActivity : ComponentActivity() {
                                     currentScreen = Screen.Detail(video)
                                 },
                                 onLoginRequired = {
+                                    sharedPreferences.edit().remove("dropbox_access_token").apply()
                                     currentScreen = Screen.Login
                                 }
                             )

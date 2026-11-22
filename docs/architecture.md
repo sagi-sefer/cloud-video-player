@@ -24,7 +24,7 @@ com.example.cloudvideoplayer/
   * `VideoPlayerRepository`: Playback progress storage and observation.
 
 #### B. `application` (Use Cases Layer)
-* Use cases for fetching folder contents (`FetchFolderContentUseCase`), streaming secure cloud video URLs (`GetStreamUrlUseCase`), managing playback progress (`GetPlaybackProgressUseCase`, `SavePlaybackProgressUseCase`), external subtitles (`GetExternalSubtitlesUseCase`), and video search (`SearchVideosUseCase`).
+* Use cases for fetching folder contents (`FetchFolderContentUseCase`), cataloging video folder trees (`CatalogVideosUseCase`), streaming secure cloud video URLs (`GetStreamUrlUseCase`), managing playback progress (`GetPlaybackProgressUseCase`, `SavePlaybackProgressUseCase`), external subtitles (`GetExternalSubtitlesUseCase`), and video search (`SearchVideosUseCase`).
 
 #### C. `infrastructure` (Adapters & External Drivers Layer)
 * **Dropbox Storage Adapter**: Integrates with Dropbox SDK v2 (`DropboxStorageRepositoryImpl`) using `DROPBOX_VIDEO_APP_KEY`.
