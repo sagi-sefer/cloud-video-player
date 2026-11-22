@@ -3,13 +3,20 @@ package com.example.cloudvideoplayer.presentation.ui
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.widget.Toast
-import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,13 +55,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.ui.PlayerView
 import com.example.cloudvideoplayer.presentation.PlayerUiState
 import com.example.cloudvideoplayer.presentation.PlayerViewModel
 import kotlinx.coroutines.delay
+import org.videolan.libvlc.util.VLCVideoLayout
 
-@OptIn(UnstableApi::class)
 @Composable
 fun PlayerScreen(
     viewModel: PlayerViewModel,
@@ -66,9 +71,9 @@ fun PlayerScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val showResumePrompt by viewModel.showResumePrompt.collectAsState()
-    val isPlaying by viewModel.exoPlayerManager.isPlaying.collectAsState()
-    val currentPosition by viewModel.exoPlayerManager.currentPosition.collectAsState()
-    val duration by viewModel.exoPlayerManager.duration.collectAsState()
+    val isPlaying by viewModel.vlcPlayerManager.isPlaying.collectAsState()
+    val currentPosition by viewModel.vlcPlayerManager.currentPosition.collectAsState()
+    val duration by viewModel.vlcPlayerManager.duration.collectAsState()
 
     var showControls by remember { mutableStateOf(true) }
     var showSettingsDialog by remember { mutableStateOf(false) }
@@ -101,8 +106,31 @@ fun PlayerScreen(
     // Position updates poller
     LaunchedEffect(isPlaying) {
         while (true) {
-            viewModel.exoPlayerManager.updatePosition()
+            viewModel.vlcPlayerManager.updatePosition()
             delay(1000L)
+        }
+    }
+
+    // Immersive mode: hide system bars when controls are hidden, show when controls are shown
+    DisposableEffect(showControls) {
+        val activity = context as? Activity
+        if (activity != null) {
+            val window = activity.window
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            if (showControls) {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+            } else {
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        }
+        onDispose {
+            val activity = context as? Activity
+            if (activity != null) {
+                val window = activity.window
+                val controller = WindowCompat.getInsetsController(window, window.decorView)
+                controller.show(WindowInsetsCompat.Type.systemBars())
+            }
         }
     }
 
@@ -128,19 +156,17 @@ fun PlayerScreen(
                 )
             }
             is PlayerUiState.Ready -> {
-                // ExoPlayer View
+                // VLC Video View Layout
                 AndroidView(
                     factory = { ctx ->
-                        PlayerView(ctx).apply {
-                            player = viewModel.exoPlayerManager.exoPlayer
-                            useController = false
-                            subtitleView?.apply {
-                                setApplyEmbeddedStyles(true)
-                                setApplyEmbeddedFontSizes(true)
-                            }
+                        VLCVideoLayout(ctx).apply {
+                            viewModel.vlcPlayerManager.mediaPlayer.attachViews(this, null, false, false)
                         }
                     },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    onRelease = { _ ->
+                        viewModel.vlcPlayerManager.mediaPlayer.detachViews()
+                    }
                 )
 
                 // Resume Prompt Dialog
@@ -175,7 +201,6 @@ fun PlayerScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(80.dp)
                                 .background(
                                     Brush.verticalGradient(
                                         colors = listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)
@@ -186,6 +211,7 @@ fun PlayerScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .windowInsetsPadding(WindowInsets.safeDrawing)
                                     .padding(16.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
@@ -206,7 +232,6 @@ fun PlayerScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(100.dp)
                                 .background(
                                     Brush.verticalGradient(
                                         colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
@@ -217,6 +242,7 @@ fun PlayerScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .windowInsetsPadding(WindowInsets.safeDrawing)
                                     .padding(horizontal = 16.dp, vertical = 8.dp)
                                     .align(Alignment.BottomCenter)
                             ) {
@@ -233,7 +259,7 @@ fun PlayerScreen(
                                         value = if (duration > 0) currentPosition.toFloat() / duration.toFloat() else 0f,
                                         onValueChange = { progress ->
                                             val newPos = (progress * duration).toLong()
-                                            viewModel.exoPlayerManager.seekTo(newPos)
+                                            viewModel.vlcPlayerManager.seekTo(newPos)
                                         },
                                         modifier = Modifier
                                             .weight(1f)
@@ -252,9 +278,9 @@ fun PlayerScreen(
                                     IconButton(
                                         onClick = {
                                             if (isPlaying) {
-                                                viewModel.exoPlayerManager.pause()
+                                                viewModel.vlcPlayerManager.pause()
                                             } else {
-                                                viewModel.exoPlayerManager.resume()
+                                                viewModel.vlcPlayerManager.resume()
                                             }
                                         }
                                     ) {
@@ -272,8 +298,8 @@ fun PlayerScreen(
 
                 // Audio & Subtitle Settings Dialog (scoped at PlayerScreen top-level)
                 if (showSettingsDialog) {
-                    val audioTracks = viewModel.exoPlayerManager.getAudioTracksInfo()
-                    val subtitleTracks = viewModel.exoPlayerManager.getSubtitleTracksInfo()
+                    val audioTracks = viewModel.vlcPlayerManager.getAudioTracksInfo()
+                    val subtitleTracks = viewModel.vlcPlayerManager.getSubtitleTracksInfo()
                     val scrollState = rememberScrollState()
 
                     AlertDialog(
@@ -292,9 +318,9 @@ fun PlayerScreen(
                                     audioTracks.forEach { track ->
                                         Button(
                                             onClick = {
-                                                val success = viewModel.exoPlayerManager.selectTrack(track.groupIndex, track.trackIndex)
+                                                val success = viewModel.vlcPlayerManager.selectAudioTrack(track.id)
                                                 if (!success) {
-                                                    Toast.makeText(context, "Audio track '${track.name}' is not supported by device hardware decoder.", Toast.LENGTH_LONG).show()
+                                                    Toast.makeText(context, "Failed to select audio track '${track.name}'.", Toast.LENGTH_LONG).show()
                                                 } else {
                                                     showSettingsDialog = false
                                                 }
@@ -312,7 +338,7 @@ fun PlayerScreen(
                                 Text("Subtitle Tracks:", style = MaterialTheme.typography.titleSmall)
                                 Button(
                                     onClick = {
-                                        viewModel.exoPlayerManager.setSubtitleEnabled(false)
+                                        viewModel.vlcPlayerManager.disableSubtitles()
                                         showSettingsDialog = false
                                     },
                                     modifier = Modifier
@@ -327,9 +353,9 @@ fun PlayerScreen(
                                     subtitleTracks.forEach { track ->
                                         Button(
                                             onClick = {
-                                                val success = viewModel.exoPlayerManager.selectTrack(track.groupIndex, track.trackIndex)
+                                                val success = viewModel.vlcPlayerManager.selectSubtitleTrack(track.id)
                                                 if (!success) {
-                                                    Toast.makeText(context, "Subtitle '${track.name}' is not supported.", Toast.LENGTH_LONG).show()
+                                                    Toast.makeText(context, "Failed to select subtitle '${track.name}'.", Toast.LENGTH_LONG).show()
                                                 } else {
                                                     showSettingsDialog = false
                                                 }

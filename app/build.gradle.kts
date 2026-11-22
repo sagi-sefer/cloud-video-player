@@ -65,6 +65,9 @@ android {
             excludes += "META-INF/ASL2.0"
             excludes += "META-INF/INDEX.LIST"
         }
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     applicationVariants.all {
@@ -102,10 +105,8 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
-    // Media3 ExoPlayer & UI for Video
-    implementation(libs.media3.exoplayer)
-    implementation(libs.media3.ui)
-    implementation(libs.media3.session)
+    // LibVLC for full format & subtitle support (VOBSUB, PGS, ASS, etc.)
+    implementation("org.videolan.android:libvlc-all:3.6.0")
 
     // Coil
     implementation(libs.coil.compose)

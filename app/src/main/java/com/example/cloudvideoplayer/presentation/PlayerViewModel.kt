@@ -8,7 +8,7 @@ import com.example.cloudvideoplayer.application.GetStreamUrlUseCase
 import com.example.cloudvideoplayer.application.SavePlaybackProgressUseCase
 import com.example.cloudvideoplayer.domain.model.PlaybackProgress
 import com.example.cloudvideoplayer.domain.model.SubtitleItem
-import com.example.cloudvideoplayer.infrastructure.player.ExoPlayerManager
+import com.example.cloudvideoplayer.infrastructure.player.VlcPlayerManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,7 +37,7 @@ class PlayerViewModel @Inject constructor(
     private val getExternalSubtitlesUseCase: GetExternalSubtitlesUseCase,
     private val getPlaybackProgressUseCase: GetPlaybackProgressUseCase,
     private val savePlaybackProgressUseCase: SavePlaybackProgressUseCase,
-    val exoPlayerManager: ExoPlayerManager
+    val vlcPlayerManager: VlcPlayerManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<PlayerUiState>(PlayerUiState.Loading)
@@ -92,12 +92,12 @@ class PlayerViewModel @Inject constructor(
 
     fun startPlayback(startPositionMs: Long) {
         _showResumePrompt.value = false
-        exoPlayerManager.prepareAndPlay(cachedStreamUrl, cachedSubtitles, startPositionMs)
+        vlcPlayerManager.prepareAndPlay(cachedStreamUrl, cachedSubtitles, startPositionMs)
     }
 
     fun saveProgress() {
-        val position = exoPlayerManager.exoPlayer.currentPosition
-        val duration = exoPlayerManager.exoPlayer.duration
+        val position = vlcPlayerManager.currentPosition.value
+        val duration = vlcPlayerManager.duration.value
         if (cachedVideoId.isNotBlank() && duration > 0) {
             viewModelScope.launch {
                 savePlaybackProgressUseCase(
@@ -120,3 +120,4 @@ class PlayerViewModel @Inject constructor(
         saveProgress()
     }
 }
+

@@ -1,7 +1,7 @@
 package com.example.cloudvideoplayer.di
 
 import android.content.Context
-import com.example.cloudvideoplayer.infrastructure.player.ExoPlayerManager
+import com.example.cloudvideoplayer.infrastructure.player.VlcPlayerManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -15,9 +15,10 @@ object PlayerModule {
 
     @Provides
     @Singleton
-    fun provideExoPlayerManager(
+    fun provideVlcPlayerManager(
         @ApplicationContext context: Context
-    ): ExoPlayerManager {
-        return ExoPlayerManager(context)
+    ): VlcPlayerManager {
+        return VlcPlayerManager(context)
     }
 }
+

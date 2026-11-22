@@ -14,8 +14,8 @@
 * **Emulator Network & SSL/TLS Considerations**:
   * If testing on an **Android Emulator**, ensure the emulator has active internet access (test opening browser inside emulator).
   * Ensure the emulator's system date and time are correctly synchronized with host/network; incorrect clock settings cause SSL handshake failures when fetching temporary links from Dropbox (`dl.dropboxusercontent.com`).
-* **Embedded Subtitles in MKV/MP4**:
-  * Extracted via Media3 ExoPlayer extractors (`DefaultExtractorsFactory` with text track transcoding enabled). Standard text subtitle streams (SubRip, WebVTT) are supported automatically. Complex bitmap subtitles (VobSub/PGS) or unsupported codecs may not render without hardware/decoder support.
+* **Embedded Subtitles in MKV/MP4 (VOBSUB, PGS, ASS, SRT)**:
+  * Handled natively by LibVLC (`libvlc-all`), which supports all embedded subtitle formats including bitmap/image subtitles (`VOBSUB` / `PGS`) and text subtitles (`ASS`, `SRT`, `VTT`).
 * **Track Detection Timing**:
   * Subtitle tracks appear in the Settings dialog once ExoPlayer finishes preparing the media source and firing `onTracksChanged`. If opened immediately upon playback start, allow 1–2 seconds for track discovery.
 
@@ -24,6 +24,6 @@
 * **Dropbox Integration**: `DropboxStorageRepositoryImpl` queries Dropbox v2 files, folder contents, temporary stream links, and external `.srt`/`.vtt`.
 * **Home Folder Selection & Recursive Cataloging**: Allows users to set/save any Dropbox folder as their root video folder via the ⭐ button. Uses `CatalogVideosUseCase` and Dropbox API `withRecursive(true)` to recursively discover all videos across all subfolders and auto-open the cataloged **Video Grid Page** (`LibraryViewMode.GRID`). Includes view mode toggles between Video Grid and Folder Browser.
 * **Room Database**: Persists last known playback positions (`PlaybackProgressEntity`, `PlaybackProgressDao`, `CloudVideoDatabase`).
-* **Media3 ExoPlayer Video Rendering**: Utilizes `ExoPlayerManager` and `PlayerView` with multi-format video streaming and external subtitle configuration.
+* **LibVLC Video Player Rendering**: Utilizes `VlcPlayerManager` and `VLCVideoLayout` with robust multi-format video streaming and full support for all embedded (VOBSUB, PGS, ASS) and external subtitles.
 * **Presentation & Rotation**: Supports vertical detail view with dynamic orientation toggling to landscape full-screen player with 5-second auto-hide controls, gradient scrims, and resume prompt dialog.
 * **Android TV**: `TvLibraryScreen` built with Jetpack Compose for TV (`androidx.tv`) and Leanback launcher integration.

@@ -28,7 +28,7 @@ com.example.cloudvideoplayer/
 
 #### C. `infrastructure` (Adapters & External Drivers Layer)
 * **Dropbox Storage Adapter**: Integrates with Dropbox SDK v2 (`DropboxStorageRepositoryImpl`) using `DROPBOX_VIDEO_APP_KEY`.
-* **Video Player Adapter**: Wraps AndroidX Media3 `ExoPlayer` (`ExoPlayerManager`) with track selection and external `.srt`/`.vtt` subtitle configuration.
+* **Video Player Adapter**: Wraps LibVLC for Android (`VlcPlayerManager`, `VLCVideoLayout`) supporting advanced video formats and all subtitle formats (including embedded VOBSUB, PGS, ASS, and external SRT/VTT).
 * **Database (Room)**: Caches local playback timestamps (`CloudVideoDatabase`, `PlaybackProgressDao`).
 * **Dependency Injection (Hilt)**: Modular bindings (`DropboxModule`, `DatabaseModule`, `PlayerModule`).
 
