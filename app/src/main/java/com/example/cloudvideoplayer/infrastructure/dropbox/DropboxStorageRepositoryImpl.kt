@@ -38,7 +38,11 @@ class DropboxStorageRepositoryImpl @Inject constructor(
     override suspend fun listFolder(path: String): Result<List<MediaItem>> = withContext(Dispatchers.IO) {
         try {
             val client = clientProvider() ?: return@withContext Result.failure(IllegalAccessException("Dropbox client not initialized. Please authenticate."))
-            val cleanPath = if (path == "/" || path.isEmpty()) "" else path
+            val cleanPath = when {
+                path == "/" || path.isEmpty() -> ""
+                !path.startsWith("/") -> "/$path"
+                else -> path
+            }
             val result = client.files().listFolder(cleanPath)
             val items = mutableListOf<MediaItem>()
 

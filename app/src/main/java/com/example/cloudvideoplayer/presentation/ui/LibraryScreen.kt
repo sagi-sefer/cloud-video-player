@@ -2,6 +2,7 @@ package com.example.cloudvideoplayer.presentation.ui
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -105,15 +106,11 @@ fun LibraryScreen(
                     if (!isSearching) {
                         IconButton(
                             onClick = {
-                                viewModel.setHomeFolderAndCatalog(currentPath)
-                                Toast.makeText(
-                                    context,
-                                    "Setting root folder & cataloging videos...",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                android.util.Log.d("LibraryScreen", "Select Root Folder button clicked")
+                                viewModel.openRootFolderDialog()
                             }
                         ) {
-                            Icon(Icons.Default.Star, contentDescription = "Set Root & Catalog")
+                            Icon(Icons.Default.Folder, contentDescription = "Select Root Folder")
                         }
                         IconButton(onClick = { viewModel.toggleViewMode() }) {
                             val state = uiState
@@ -268,5 +265,71 @@ fun LibraryScreen(
                 }
             }
         }
+    }
+
+    val dialogState by viewModel.rootFolderDialogState.collectAsState()
+
+    if (dialogState.isVisible) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { viewModel.closeRootFolderDialog() },
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurface,
+            title = {
+                Column {
+                    Text("Select Root Folder", color = MaterialTheme.colorScheme.onSurface)
+                    Text("Path: ${if (dialogState.currentPath.isEmpty()) "/" else dialogState.currentPath}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            text = {
+                Column(modifier = Modifier.height(350.dp).fillMaxWidth()) {
+                    if (dialogState.pathStack.size > 1) {
+                        androidx.compose.material3.TextButton(onClick = { viewModel.dialogNavigateBack() }) {
+                            Text("⬅️ Back to Parent", color = MaterialTheme.colorScheme.primary)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    if (dialogState.folders.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("No folders found.", color = MaterialTheme.colorScheme.onSurface)
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.shapes.medium)
+                        ) {
+                            items(dialogState.folders) { folder ->
+                                ListItem(
+                                    headlineContent = { Text(folder.name, color = MaterialTheme.colorScheme.onSurface) },
+                                    leadingContent = { Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                    colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                    modifier = Modifier.clickable {
+                                        android.util.Log.d("LibraryScreen", "Clicked dialog folder: ${folder.name}")
+                                        viewModel.navigateDialogFolder(folder)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.Button(
+                    onClick = {
+                        android.util.Log.d("LibraryScreen", "Clicked Save button in root folder dialog")
+                        viewModel.saveSelectedRootFolder()
+                        Toast.makeText(context, "Root folder saved successfully!", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { viewModel.closeRootFolderDialog() }) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+        )
     }
 }

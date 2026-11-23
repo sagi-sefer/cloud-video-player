@@ -23,6 +23,7 @@ import com.example.cloudvideoplayer.presentation.ui.LibraryScreen
 import com.example.cloudvideoplayer.presentation.ui.LoginScreen
 import com.example.cloudvideoplayer.presentation.ui.PlayerScreen
 import com.example.cloudvideoplayer.presentation.ui.VideoDetailScreen
+import com.example.cloudvideoplayer.presentation.tv.TvLibraryScreen
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -67,19 +68,36 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         is Screen.Library -> {
-                            LibraryScreen(
-                                viewModel = libraryViewModel,
-                                onFolderClick = { folder ->
-                                    libraryViewModel.navigateToFolder(folder)
-                                },
-                                onVideoClick = { video ->
-                                    currentScreen = Screen.Detail(video)
-                                },
-                                onLoginRequired = {
-                                    sharedPreferences.edit().remove("dropbox_access_token").apply()
-                                    currentScreen = Screen.Login
-                                }
-                            )
+                            val isTv = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
+                            if (isTv) {
+                                TvLibraryScreen(
+                                    viewModel = libraryViewModel,
+                                    onItemClick = { item ->
+                                        when (item) {
+                                            is MediaItem.Folder -> libraryViewModel.navigateToFolder(item)
+                                            is MediaItem.VideoItem -> currentScreen = Screen.Player(item)
+                                        }
+                                    },
+                                    onLoginRequired = {
+                                        sharedPreferences.edit().remove("dropbox_access_token").apply()
+                                        currentScreen = Screen.Login
+                                    }
+                                )
+                            } else {
+                                LibraryScreen(
+                                    viewModel = libraryViewModel,
+                                    onFolderClick = { folder ->
+                                        libraryViewModel.navigateToFolder(folder)
+                                    },
+                                    onVideoClick = { video ->
+                                        currentScreen = Screen.Detail(video)
+                                    },
+                                    onLoginRequired = {
+                                        sharedPreferences.edit().remove("dropbox_access_token").apply()
+                                        currentScreen = Screen.Login
+                                    }
+                                )
+                            }
                         }
                         is Screen.Detail -> {
                             VideoDetailScreen(
@@ -94,13 +112,14 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         is Screen.Player -> {
+                            val isTv = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
                             PlayerScreen(
                                 viewModel = playerViewModel,
                                 videoId = screen.videoItem.id,
                                 videoPath = screen.videoItem.path,
                                 videoTitle = screen.videoItem.name,
                                 onBack = {
-                                    currentScreen = Screen.Detail(screen.videoItem)
+                                    currentScreen = if (isTv) Screen.Library else Screen.Detail(screen.videoItem)
                                 }
                             )
                         }

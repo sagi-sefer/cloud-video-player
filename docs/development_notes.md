@@ -26,4 +26,4 @@
 * **Room Database**: Persists last known playback positions (`PlaybackProgressEntity`, `PlaybackProgressDao`, `CloudVideoDatabase`).
 * **LibVLC Video Player Rendering**: Utilizes `VlcPlayerManager` and `VLCVideoLayout` with robust multi-format video streaming and full support for all embedded (VOBSUB, PGS, ASS) and external subtitles.
 * **Presentation & Rotation**: Supports vertical detail view with dynamic orientation toggling to landscape full-screen player with 5-second auto-hide controls, gradient scrims, and resume prompt dialog.
-* **Android TV**: `TvLibraryScreen` built with Jetpack Compose for TV (`androidx.tv`) and Leanback launcher integration.
+* **Android TV**: `TvLibraryScreen` built with Jetpack Compose for TV (`androidx.tv`) featuring D-pad accessible action buttons (**⭐ Set Root**, **🏠 Home**, **⬅️ Back**) and hierarchical folder browsing (Category -> Movie folder -> Video file playback) with Leanback launcher integration.

@@ -32,6 +32,13 @@ sealed interface LibraryUiState {
     object Unauthenticated : LibraryUiState
 }
 
+data class RootFolderDialogState(
+    val isVisible: Boolean = false,
+    val currentPath: String = "",
+    val folders: List<MediaItem.Folder> = emptyList(),
+    val pathStack: List<String> = listOf("")
+)
+
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val fetchFolderContentUseCase: FetchFolderContentUseCase,
@@ -43,16 +50,133 @@ class LibraryViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<LibraryUiState>(LibraryUiState.Loading)
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
-    private val homeFolder = sharedPreferences.getString("dropbox_home_folder", "") ?: ""
-    private val pathStack = mutableListOf(homeFolder)
+    private val _rootFolderDialogState = MutableStateFlow(RootFolderDialogState())
+    val rootFolderDialogState: StateFlow<RootFolderDialogState> = _rootFolderDialogState.asStateFlow()
+
+    private val pathStack = mutableListOf<String>()
     private var currentViewMode = LibraryViewMode.FOLDER
     private var catalogedVideosList = listOf<MediaItem.VideoItem>()
     private var isCatalogingInProgress = false
 
     init {
-        loadFolder(homeFolder)
-        if (homeFolder.isNotEmpty()) {
-            catalogRootFolder(homeFolder)
+        android.util.Log.d("LibraryViewModel", "Init started. homeFolder: '${getHomeFolder()}'")
+        try {
+            val home = getHomeFolder()
+            pathStack.add(home)
+            loadFolder(home)
+            if (home.isNotEmpty()) {
+                catalogRootFolder(home)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("LibraryViewModel", "Exception in LibraryViewModel init", e)
+        }
+    }
+
+    fun openRootFolderDialog() {
+        android.util.Log.d("LibraryViewModel", "openRootFolderDialog clicked")
+        try {
+            loadDialogFolder("")
+        } catch (e: Exception) {
+            android.util.Log.e("LibraryViewModel", "Exception in openRootFolderDialog", e)
+        }
+    }
+
+    fun closeRootFolderDialog() {
+        android.util.Log.d("LibraryViewModel", "closeRootFolderDialog clicked")
+        try {
+            _rootFolderDialogState.value = RootFolderDialogState(isVisible = false)
+        } catch (e: Exception) {
+            android.util.Log.e("LibraryViewModel", "Exception in closeRootFolderDialog", e)
+        }
+    }
+
+    fun loadDialogFolder(path: String) {
+        viewModelScope.launch {
+            android.util.Log.d("LibraryViewModel", "loadDialogFolder started for path: '$path'")
+            try {
+                val result = fetchFolderContentUseCase(path)
+                result.fold(
+                    onSuccess = { items ->
+                        val folders = items.filterIsInstance<MediaItem.Folder>()
+                        android.util.Log.d("LibraryViewModel", "loadDialogFolder success for '$path': found ${folders.size} folders")
+                        val currentStack = _rootFolderDialogState.value.pathStack.toMutableList()
+                        if (currentStack.lastOrNull() != path) {
+                            currentStack.add(path)
+                        }
+                        _rootFolderDialogState.value = RootFolderDialogState(
+                            isVisible = true,
+                            currentPath = path,
+                            folders = folders,
+                            pathStack = currentStack
+                        )
+                    },
+                    onFailure = { error ->
+                        android.util.Log.e("LibraryViewModel", "loadDialogFolder failed for path '$path'", error)
+                    }
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("LibraryViewModel", "Exception in loadDialogFolder for path '$path'", e)
+            }
+        }
+    }
+
+    fun navigateDialogFolder(folder: MediaItem.Folder) {
+        android.util.Log.d("LibraryViewModel", "navigateDialogFolder into '${folder.name}' (path: '${folder.path}')")
+        try {
+            loadDialogFolder(folder.path)
+        } catch (e: Exception) {
+            android.util.Log.e("LibraryViewModel", "Exception in navigateDialogFolder", e)
+        }
+    }
+
+    fun dialogNavigateBack() {
+        val stack = _rootFolderDialogState.value.pathStack.toMutableList()
+        android.util.Log.d("LibraryViewModel", "dialogNavigateBack requested, stack size: ${stack.size}")
+        try {
+            if (stack.size > 1) {
+                stack.removeAt(stack.size - 1)
+                val prevPath = stack.last()
+                android.util.Log.d("LibraryViewModel", "dialogNavigateBack navigating to previous path: '$prevPath'")
+                viewModelScope.launch {
+                    try {
+                        val result = fetchFolderContentUseCase(prevPath)
+                        result.fold(
+                            onSuccess = { items ->
+                                val folders = items.filterIsInstance<MediaItem.Folder>()
+                                _rootFolderDialogState.value = RootFolderDialogState(
+                                    isVisible = true,
+                                    currentPath = prevPath,
+                                    folders = folders,
+                                    pathStack = stack
+                                )
+                            },
+                            onFailure = { error ->
+                                android.util.Log.e("LibraryViewModel", "dialogNavigateBack failed for path '$prevPath'", error)
+                            }
+                        )
+                    } catch (e: Exception) {
+                        android.util.Log.e("LibraryViewModel", "Exception inside dialogNavigateBack coroutine", e)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("LibraryViewModel", "Exception in dialogNavigateBack", e)
+        }
+    }
+
+    fun saveSelectedRootFolder() {
+        val selectedPath = _rootFolderDialogState.value.currentPath
+        android.util.Log.d("LibraryViewModel", "saveSelectedRootFolder clicked. Selected path: '$selectedPath'")
+        try {
+            sharedPreferences.edit().putString("dropbox_home_folder", selectedPath).apply()
+            pathStack.clear()
+            pathStack.add(selectedPath)
+            currentViewMode = LibraryViewMode.FOLDER
+            loadFolder(selectedPath)
+            closeRootFolderDialog()
+            android.util.Log.d("LibraryViewModel", "Successfully saved root folder and updated library view to '$selectedPath'")
+        } catch (e: Exception) {
+            android.util.Log.e("LibraryViewModel", "Exception in saveSelectedRootFolder for path '$selectedPath'", e)
         }
     }
 
@@ -121,9 +245,12 @@ class LibraryViewModel @Inject constructor(
         return false
     }
 
-    fun setHomeFolderAndCatalog(path: String) {
+    fun setAsRootFolder(path: String) {
         sharedPreferences.edit().putString("dropbox_home_folder", path).apply()
-        catalogRootFolder(path)
+        pathStack.clear()
+        pathStack.add(path)
+        currentViewMode = LibraryViewMode.FOLDER
+        loadFolder(path)
     }
 
     fun catalogRootFolder(path: String = currentPath) {
