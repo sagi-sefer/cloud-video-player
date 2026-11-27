@@ -26,6 +26,7 @@ import com.example.cloudvideoplayer.presentation.ui.VideoDetailScreen
 import com.example.cloudvideoplayer.presentation.tv.TvLibraryScreen
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import com.example.cloudvideoplayer.BuildConfig
 
 sealed class Screen {
     object Login : Screen()
@@ -55,7 +56,14 @@ class MainActivity : ComponentActivity() {
                 ) {
                     var currentScreen by remember {
                         val token = sharedPreferences.getString("dropbox_access_token", null)
-                        mutableStateOf<Screen>(if (!token.isNullOrBlank()) Screen.Library else Screen.Login)
+                        val configToken = BuildConfig.DROPBOX_ACCESS_TOKEN
+                        val effectiveToken = if (token.isNullOrBlank() && configToken.isNotBlank()) {
+                            sharedPreferences.edit().putString("dropbox_access_token", configToken).apply()
+                            configToken
+                        } else {
+                            token
+                        }
+                        mutableStateOf<Screen>(if (!effectiveToken.isNullOrBlank()) Screen.Library else Screen.Login)
                     }
 
                     when (val screen = currentScreen) {

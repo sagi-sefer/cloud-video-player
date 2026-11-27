@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -194,12 +196,23 @@ fun LibraryScreen(
                                             modifier = Modifier.padding(12.dp),
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
-                                            Icon(
-                                                Icons.Default.Movie,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.height(48.dp)
-                                            )
+                                            if (video.thumbnailUrl != null) {
+                                                coil.compose.AsyncImage(
+                                                    model = video.thumbnailUrl,
+                                                    contentDescription = video.name,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(110.dp),
+                                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                                )
+                                            } else {
+                                                Icon(
+                                                    Icons.Default.Movie,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.height(48.dp)
+                                                )
+                                            }
                                             Spacer(modifier = Modifier.height(8.dp))
                                             Text(
                                                 text = video.name,
@@ -253,7 +266,18 @@ fun LibraryScreen(
                                             ListItem(
                                                 headlineContent = { Text(item.name) },
                                                 supportingContent = { Text("Format: ${item.format} • Size: ${item.size / (1024 * 1024)} MB") },
-                                                leadingContent = { Icon(Icons.Default.Movie, contentDescription = null) },
+                                                leadingContent = {
+                                                    if (item.thumbnailUrl != null) {
+                                                        coil.compose.AsyncImage(
+                                                            model = item.thumbnailUrl,
+                                                            contentDescription = item.name,
+                                                            modifier = Modifier.size(56.dp),
+                                                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                                        )
+                                                    } else {
+                                                        Icon(Icons.Default.Movie, contentDescription = null)
+                                                    }
+                                                },
                                                 modifier = Modifier.clickable { onVideoClick(item) }
                                             )
                                         }

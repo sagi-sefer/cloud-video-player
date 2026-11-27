@@ -322,12 +322,14 @@ class LibraryViewModel @Inject constructor(
 
     private fun handleError(error: Throwable) {
         val msg = listOfNotNull(error.message, error.localizedMessage, error.toString()).joinToString(" ")
-        if (error is IllegalAccessException || 
-            msg.contains("scope", ignoreCase = true) || 
-            msg.contains("permitted", ignoreCase = true) || 
-            msg.contains("unauthorized", ignoreCase = true) || 
-            msg.contains("expired", ignoreCase = true) || 
-            msg.contains("token", ignoreCase = true)) {
+        val isAuthError = error is IllegalAccessException ||
+            msg.contains("unauthorized", ignoreCase = true) ||
+            msg.contains("invalid_access_token", ignoreCase = true) ||
+            msg.contains("expired_access_token", ignoreCase = true) ||
+            msg.contains("dbxauthexception", ignoreCase = true) ||
+            msg.contains("401", ignoreCase = true)
+
+        if (isAuthError) {
             _uiState.value = LibraryUiState.Unauthenticated
         } else {
             _uiState.value = LibraryUiState.Error(error.localizedMessage ?: error.message ?: "Unknown error")

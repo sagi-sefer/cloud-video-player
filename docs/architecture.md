@@ -17,7 +17,7 @@ com.example.cloudvideoplayer/
 
 #### A. `domain` (Pure Kotlin Layer)
 * **Models**:
-  * `MediaItem`: Sealed class representing `Folder` and `VideoItem` (supporting MKV, MP4, WEBM, AVI, MOV, M4V).
+  * `MediaItem`: Sealed class representing `Folder` and `VideoItem` (supporting MKV, MP4, WEBM, AVI, MOV, M4V, with automatic accompanying `.jpg`/`.jpeg` thumbnail discovery).
   * `PlaybackProgress`: Last known playback timestamp persistence model.
 * **Interfaces**:
   * `CloudStorageRepository`: Dropbox querying, temporary stream URL resolution, and external subtitle discovery.

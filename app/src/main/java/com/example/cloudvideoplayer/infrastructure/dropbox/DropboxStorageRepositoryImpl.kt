@@ -49,33 +49,14 @@ class DropboxStorageRepositoryImpl @Inject constructor(
             var entries = result.entries
             var hasMore = result.hasMore
 
+            val files = mutableListOf<FileMetadata>()
+            val folders = mutableListOf<FolderMetadata>()
+
             while (true) {
                 for (entry in entries) {
                     when (entry) {
-                        is FolderMetadata -> {
-                            items.add(
-                                MediaItem.Folder(
-                                    id = entry.id ?: entry.pathLower ?: entry.name,
-                                    name = entry.name,
-                                    path = entry.pathLower ?: entry.pathDisplay ?: ""
-                                )
-                            )
-                        }
-                        is FileMetadata -> {
-                            val ext = entry.name.substringAfterLast('.', "").lowercase()
-                            if (ext in supportedVideoExtensions) {
-                                items.add(
-                                    MediaItem.VideoItem(
-                                        id = entry.id ?: entry.pathLower ?: entry.name,
-                                        name = entry.name,
-                                        path = entry.pathLower ?: entry.pathDisplay ?: "",
-                                        size = entry.size,
-                                        lastModified = entry.serverModified?.time ?: 0L,
-                                        format = VideoFormat.fromFileName(entry.name)
-                                    )
-                                )
-                            }
-                        }
+                        is FolderMetadata -> folders.add(entry)
+                        is FileMetadata -> files.add(entry)
                         else -> {}
                     }
                 }
@@ -83,6 +64,80 @@ class DropboxStorageRepositoryImpl @Inject constructor(
                 val continueResult = client.files().listFolderContinue(result.cursor)
                 entries = continueResult.entries
                 hasMore = continueResult.hasMore
+            }
+
+            val imageExtensions = setOf("jpg", "jpeg")
+            val imageMap = files
+                .filter { it.name.substringAfterLast('.', "").lowercase() in imageExtensions }
+                .associateBy { it.name.substringBeforeLast('.').lowercase() }
+
+            for (folder in folders) {
+                val folderBaseName = folder.name.lowercase()
+                val parentImageFile = imageMap[folderBaseName]
+                val imagePath = if (parentImageFile != null) {
+                    parentImageFile.pathLower ?: parentImageFile.pathDisplay
+                } else {
+                    try {
+                        val subfolderResult = client.files().listFolder(folder.pathLower ?: folder.pathDisplay ?: "")
+                        val subfolderImage = subfolderResult.entries
+                            .filterIsInstance<FileMetadata>()
+                            .firstOrNull { it.name.substringAfterLast('.', "").lowercase() in imageExtensions }
+                        subfolderImage?.pathLower ?: subfolderImage?.pathDisplay
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+
+                val thumbnailUrl = if (imagePath != null) {
+                    try {
+                        client.files().getTemporaryLink(imagePath).link
+                    } catch (_: Exception) {
+                        null
+                    }
+                } else {
+                    null
+                }
+
+                items.add(
+                    MediaItem.Folder(
+                        id = folder.id ?: folder.pathLower ?: folder.name,
+                        name = folder.name,
+                        path = folder.pathLower ?: folder.pathDisplay ?: "",
+                        thumbnailUrl = thumbnailUrl
+                    )
+                )
+            }
+
+            for (file in files) {
+                val ext = file.name.substringAfterLast('.', "").lowercase()
+                if (ext in supportedVideoExtensions) {
+                    val videoName = file.name
+                    val baseName = videoName.substringBeforeLast('.').lowercase()
+                    val imageFile = imageMap[baseName] ?: imageMap.values.firstOrNull()
+                    val imagePath = imageFile?.pathLower ?: imageFile?.pathDisplay
+
+                    val thumbnailUrl = if (imagePath != null) {
+                        try {
+                            client.files().getTemporaryLink(imagePath).link
+                        } catch (_: Exception) {
+                            null
+                        }
+                    } else {
+                        null
+                    }
+
+                    items.add(
+                        MediaItem.VideoItem(
+                            id = file.id ?: file.pathLower ?: file.name,
+                            name = videoName,
+                            path = file.pathLower ?: file.pathDisplay ?: "",
+                            size = file.size,
+                            lastModified = file.serverModified?.time ?: 0L,
+                            format = VideoFormat.fromFileName(videoName),
+                            thumbnailUrl = thumbnailUrl
+                        )
+                    )
+                }
             }
 
             Result.success(items.sortedBy { it.name.lowercase() })
@@ -145,80 +200,19 @@ class DropboxStorageRepositoryImpl @Inject constructor(
             val client = clientProvider() ?: return@withContext Result.failure(IllegalAccessException("Dropbox client not initialized. Please authenticate."))
             val videos = mutableListOf<MediaItem.VideoItem>()
 
-            // 1. Try fast Dropbox Search API first
-            try {
-                val searchResult = client.files().searchV2Builder("mkv mp4 avi mov m4v webm")
-                    .withOptions(
-                        com.dropbox.core.v2.files.SearchOptions.newBuilder()
-                            .withPath(if (cleanPath.isEmpty()) null else cleanPath)
-                            .withMaxResults(500L)
-                            .build()
-                    )
-                    .start()
-
-                for (match in searchResult.matches) {
-                    val meta = match.metadata
-                    if (meta.isMetadata) {
-                        val fileVal = meta.metadataValue
-                        if (fileVal is FileMetadata) {
-                            val ext = fileVal.name.substringAfterLast('.', "").lowercase()
-                            if (ext in supportedVideoExtensions) {
-                                val fullPath = fileVal.pathLower ?: fileVal.pathDisplay ?: ""
-                                val parentFolder = fullPath.substringBeforeLast('/')
-                                val movieFolderName = parentFolder.substringAfterLast('/').ifEmpty { fileVal.name.substringBeforeLast('.') }
-                                videos.add(
-                                    MediaItem.VideoItem(
-                                        id = fileVal.id ?: fullPath,
-                                        name = movieFolderName, // 02 level folder name!
-                                        path = fullPath,
-                                        size = fileVal.size,
-                                        lastModified = fileVal.serverModified?.time ?: 0L,
-                                        format = VideoFormat.fromFileName(fileVal.name)
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-                if (videos.isNotEmpty()) {
-                    val sorted = videos.distinctBy { it.id }.sortedBy { it.name.lowercase() }
-                    android.util.Log.d("DropboxRepo", "SearchV2 found ${sorted.size} videos instantly!")
-                    onProgress(sorted)
-                    return@withContext Result.success(sorted)
-                }
-            } catch (e: Exception) {
-                android.util.Log.w("DropboxRepo", "SearchV2 fallback to recursive listFolder", e)
-            }
-
-            // 2. Fallback to listFolder withRecursive with live progress updates
+            // Fallback to listFolder withRecursive with live progress updates and thumbnail association
             val result = client.files().listFolderBuilder(cleanPath).withRecursive(true).start()
             var entries = result.entries
             var hasMore = result.hasMore
             var cursor = result.cursor
 
+            val allFiles = mutableListOf<FileMetadata>()
             while (true) {
                 for (entry in entries) {
                     if (entry is FileMetadata) {
-                        val ext = entry.name.substringAfterLast('.', "").lowercase()
-                        if (ext in supportedVideoExtensions) {
-                            val fullPath = entry.pathLower ?: entry.pathDisplay ?: ""
-                            val parentFolder = fullPath.substringBeforeLast('/')
-                            val movieFolderName = parentFolder.substringAfterLast('/').ifEmpty { entry.name.substringBeforeLast('.') }
-                            videos.add(
-                                MediaItem.VideoItem(
-                                    id = entry.id ?: fullPath,
-                                    name = movieFolderName, // 02 level folder name!
-                                    path = fullPath,
-                                    size = entry.size,
-                                    lastModified = entry.serverModified?.time ?: 0L,
-                                    format = VideoFormat.fromFileName(entry.name)
-                                )
-                            )
-                        }
+                        allFiles.add(entry)
                     }
                 }
-                val currentList = videos.distinctBy { it.id }.sortedBy { it.name.lowercase() }
-                onProgress(currentList)
                 if (!hasMore) break
                 val continueResult = client.files().listFolderContinue(cursor)
                 entries = continueResult.entries
@@ -226,8 +220,53 @@ class DropboxStorageRepositoryImpl @Inject constructor(
                 cursor = continueResult.cursor
             }
 
+            val imageExtensions = setOf("jpg", "jpeg")
+            val imageMapByFolder = allFiles
+                .filter { it.name.substringAfterLast('.', "").lowercase() in imageExtensions }
+                .groupBy { it.pathLower?.substringBeforeLast('/') ?: "" }
+                .mapValues { (_, imgList) ->
+                    imgList.associateBy { it.name.substringBeforeLast('.').lowercase() }
+                }
+
+            for (entry in allFiles) {
+                val ext = entry.name.substringAfterLast('.', "").lowercase()
+                if (ext in supportedVideoExtensions) {
+                    val fullPath = entry.pathLower ?: entry.pathDisplay ?: ""
+                    val parentFolder = fullPath.substringBeforeLast('/')
+                    val movieFolderName = parentFolder.substringAfterLast('/').ifEmpty { entry.name.substringBeforeLast('.') }
+                    val videoBaseName = entry.name.substringBeforeLast('.').lowercase()
+                    val folderImages = imageMapByFolder[parentFolder]
+                    val imageFile = folderImages?.get(videoBaseName) ?: folderImages?.values?.firstOrNull()
+                    val imagePath = imageFile?.pathLower ?: imageFile?.pathDisplay
+
+                    val thumbnailUrl = if (imagePath != null) {
+                        try {
+                            client.files().getTemporaryLink(imagePath).link
+                        } catch (_: Exception) {
+                            null
+                        }
+                    } else {
+                        null
+                    }
+
+                    videos.add(
+                        MediaItem.VideoItem(
+                            id = entry.id ?: fullPath,
+                            name = movieFolderName,
+                            path = fullPath,
+                            size = entry.size,
+                            lastModified = entry.serverModified?.time ?: 0L,
+                            format = VideoFormat.fromFileName(entry.name),
+                            thumbnailUrl = thumbnailUrl
+                        )
+                    )
+                }
+                val currentList = videos.distinctBy { it.id }.sortedBy { it.name.lowercase() }
+                onProgress(currentList)
+            }
+
             val finalVideos = videos.distinctBy { it.id }.sortedBy { it.name.lowercase() }
-            android.util.Log.d("DropboxRepo", "Finished cataloging ${finalVideos.size} videos")
+            android.util.Log.d("DropboxRepo", "Finished cataloging ${finalVideos.size} videos with thumbnails")
             Result.success(finalVideos)
         } catch (e: Exception) {
             android.util.Log.e("DropboxRepo", "Error cataloging videos for '$rootPath'", e)

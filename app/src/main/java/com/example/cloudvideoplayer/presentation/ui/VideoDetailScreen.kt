@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 fun VideoDetailScreen(
     videoName: String,
     videoPath: String,
+    thumbnailUrl: String? = null,
     onBackClick: () -> Unit,
     onPlayClick: () -> Unit
 ) {
@@ -81,6 +82,17 @@ fun VideoDetailScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            if (thumbnailUrl != null) {
+                coil.compose.AsyncImage(
+                    model = thumbnailUrl,
+                    contentDescription = videoName,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(240.dp)
+                        .padding(bottom = 16.dp),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
+            }
             Text(
                 text = videoName,
                 style = MaterialTheme.typography.headlineMedium

@@ -30,6 +30,9 @@ android {
         }
         val dropboxVideoAppKey = localProperties.getProperty("DROPBOX_VIDEO_APP_KEY", "")
         buildConfigField("String", "DROPBOX_VIDEO_APP_KEY", "\"$dropboxVideoAppKey\"")
+
+        val dropboxAccessToken = localProperties.getProperty("DROPBOX_ACCESS_TOKEN", "")
+        buildConfigField("String", "DROPBOX_ACCESS_TOKEN", "\"$dropboxAccessToken\"")
     }
 
     buildTypes {

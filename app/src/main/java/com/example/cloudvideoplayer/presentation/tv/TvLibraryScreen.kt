@@ -155,17 +155,37 @@ fun TvLibraryScreen(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(16.dp),
+                                            .fillMaxSize(),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(
-                                            text = when (item) {
-                                                is MediaItem.Folder -> if (isMovieFolder) "🎬 ${item.name}" else "📁 ${item.name}"
-                                                is MediaItem.VideoItem -> "🎬 ${item.name}"
-                                            },
-                                            style = androidx.tv.material3.MaterialTheme.typography.titleMedium
-                                        )
+                                        val thumbnailUrl = when (item) {
+                                            is MediaItem.VideoItem -> item.thumbnailUrl
+                                            is MediaItem.Folder -> item.thumbnailUrl
+                                        }
+                                        if (thumbnailUrl != null) {
+                                            coil.compose.AsyncImage(
+                                                model = thumbnailUrl,
+                                                contentDescription = item.name,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                            )
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = if (thumbnailUrl != null) 0.4f else 0.0f))
+                                                .padding(16.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = when (item) {
+                                                    is MediaItem.Folder -> if (isMovieFolder) "🎬 ${item.name}" else "📁 ${item.name}"
+                                                    is MediaItem.VideoItem -> item.name
+                                                },
+                                                style = androidx.tv.material3.MaterialTheme.typography.titleMedium,
+                                                color = androidx.compose.ui.graphics.Color.White
+                                            )
+                                        }
                                     }
                                 }
                             }

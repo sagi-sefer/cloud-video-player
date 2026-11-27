@@ -17,7 +17,8 @@ sealed class MediaItem : Parcelable {
         override val path: String,
         override val size: Long = 0L,
         override val lastModified: Long = 0L,
-        val itemCount: Int = 0
+        val itemCount: Int = 0,
+        val thumbnailUrl: String? = null
     ) : MediaItem()
 
     @Parcelize
