@@ -44,6 +44,8 @@ class MainActivity : ComponentActivity() {
     private val libraryViewModel: LibraryViewModel by viewModels()
     private val playerViewModel: PlayerViewModel by viewModels()
 
+    private var onOAuthSuccess: (() -> Unit)? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleOAuthIntent(intent)
@@ -64,6 +66,11 @@ class MainActivity : ComponentActivity() {
                             token
                         }
                         mutableStateOf<Screen>(if (!effectiveToken.isNullOrBlank()) Screen.Library else Screen.Login)
+                    }
+
+                    onOAuthSuccess = {
+                        currentScreen = Screen.Library
+                        libraryViewModel.loadFolder("")
                     }
 
                     when (val screen = currentScreen) {
@@ -155,6 +162,7 @@ class MainActivity : ComponentActivity() {
                     if (kv.size == 2 && kv[0] == "access_token") {
                         val token = kv[1]
                         sharedPreferences.edit().putString("dropbox_access_token", token).apply()
+                        onOAuthSuccess?.invoke()
                         break
                     }
                 }

@@ -23,6 +23,10 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        ndk {
+            abiFilters.addAll(setOf("armeabi-v7a", "arm64-v8a"))
+        }
+
         val localProperties = Properties()
         val localFile = rootProject.file("local.properties")
         if (localFile.exists()) {

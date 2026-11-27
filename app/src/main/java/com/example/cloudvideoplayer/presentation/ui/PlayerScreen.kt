@@ -2,31 +2,31 @@ package com.example.cloudvideoplayer.presentation.ui
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import android.view.KeyEvent as AndroidKeyEvent
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -39,7 +39,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -53,15 +52,56 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.example.cloudvideoplayer.presentation.PlayerUiState
 import com.example.cloudvideoplayer.presentation.PlayerViewModel
 import kotlinx.coroutines.delay
 import org.videolan.libvlc.util.VLCVideoLayout
+
+@Composable
+fun TvPlayerIconButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
+    content: @Composable () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    Box(
+        modifier = modifier
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .scale(if (isFocused) 1.25f else 1.0f)
+            .background(
+                color = if (isFocused) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.2f),
+                shape = CircleShape
+            )
+            .focusable(interactionSource = interactionSource)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .padding(12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
+    }
+}
 
 @Composable
 fun PlayerScreen(
@@ -81,6 +121,13 @@ fun PlayerScreen(
     var showControls by remember { mutableStateOf(true) }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
+    // Focus Requesters for D-Pad navigation
+    val playPauseFocusRequester = remember { FocusRequester() }
+    val backFocusRequester = remember { FocusRequester() }
+    val settingsFocusRequester = remember { FocusRequester() }
+    val rewindFocusRequester = remember { FocusRequester() }
+    val fastForwardFocusRequester = remember { FocusRequester() }
+
     // Load video once when videoId changes
     LaunchedEffect(videoId) {
         viewModel.loadVideo(videoId, videoPath, videoTitle)
@@ -95,6 +142,18 @@ fun PlayerScreen(
         onDispose {
             viewModel.saveProgress()
             activity?.requestedOrientation = originalOrientation
+        }
+    }
+
+    // Auto-focus play/pause button when controls become visible
+    LaunchedEffect(showControls) {
+        if (showControls && !showSettingsDialog) {
+            delay(150L)
+            try {
+                playPauseFocusRequester.requestFocus()
+            } catch (_: Exception) {
+                // Focus requester safe call
+            }
         }
     }
 
@@ -141,6 +200,62 @@ fun PlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type != KeyEventType.KeyDown) return@onKeyEvent false
+                when (keyEvent.nativeKeyEvent.keyCode) {
+                    AndroidKeyEvent.KEYCODE_DPAD_CENTER,
+                    AndroidKeyEvent.KEYCODE_ENTER,
+                    AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                        if (!showControls && !showSettingsDialog) {
+                            showControls = true
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    AndroidKeyEvent.KEYCODE_DPAD_UP,
+                    AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+                    AndroidKeyEvent.KEYCODE_DPAD_LEFT,
+                    AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
+                        if (!showControls && !showSettingsDialog) {
+                            showControls = true
+                            true
+                        } else {
+                            showControls = true
+                            false
+                        }
+                    }
+                    AndroidKeyEvent.KEYCODE_BACK -> {
+                        if (showSettingsDialog) {
+                            showSettingsDialog = false
+                            true
+                        } else if (showControls) {
+                            showControls = false
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                    AndroidKeyEvent.KEYCODE_MEDIA_PLAY,
+                    AndroidKeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                        if (isPlaying) viewModel.vlcPlayerManager.pause() else viewModel.vlcPlayerManager.resume()
+                        showControls = true
+                        true
+                    }
+                    AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
+                        viewModel.rewind()
+                        showControls = true
+                        true
+                    }
+                    AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                        viewModel.fastForward()
+                        showControls = true
+                        true
+                    }
+                    else -> false
+                }
+            }
             .clickable {
                 if (!showSettingsDialog) {
                     showControls = !showControls
@@ -220,12 +335,27 @@ fun PlayerScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    IconButton(onClick = onBack) {
+                                    TvPlayerIconButton(
+                                        onClick = onBack,
+                                        focusRequester = backFocusRequester,
+                                        modifier = Modifier.focusProperties {
+                                            down = playPauseFocusRequester
+                                            right = settingsFocusRequester
+                                        }
+                                    ) {
                                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
                                     }
+                                    Spacer(modifier = Modifier.width(12.dp))
                                     Text(text = state.videoTitle, color = Color.White, style = MaterialTheme.typography.titleMedium)
                                 }
-                                IconButton(onClick = { showSettingsDialog = true }) {
+                                TvPlayerIconButton(
+                                    onClick = { showSettingsDialog = true },
+                                    focusRequester = settingsFocusRequester,
+                                    modifier = Modifier.focusProperties {
+                                        down = playPauseFocusRequester
+                                        left = backFocusRequester
+                                    }
+                                ) {
                                     Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
                                 }
                             }
@@ -278,8 +408,13 @@ fun PlayerScreen(
                                     horizontalArrangement = Arrangement.Center,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    IconButton(
-                                        onClick = { viewModel.rewind() }
+                                    TvPlayerIconButton(
+                                        onClick = { viewModel.rewind() },
+                                        focusRequester = rewindFocusRequester,
+                                        modifier = Modifier.focusProperties {
+                                            up = backFocusRequester
+                                            right = playPauseFocusRequester
+                                        }
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.FastRewind,
@@ -290,13 +425,19 @@ fun PlayerScreen(
 
                                     Spacer(modifier = Modifier.width(32.dp))
 
-                                    IconButton(
+                                    TvPlayerIconButton(
                                         onClick = {
                                             if (isPlaying) {
                                                 viewModel.vlcPlayerManager.pause()
                                             } else {
                                                 viewModel.vlcPlayerManager.resume()
                                             }
+                                        },
+                                        focusRequester = playPauseFocusRequester,
+                                        modifier = Modifier.focusProperties {
+                                            up = backFocusRequester
+                                            left = rewindFocusRequester
+                                            right = fastForwardFocusRequester
                                         }
                                     ) {
                                         Icon(
@@ -308,8 +449,13 @@ fun PlayerScreen(
 
                                     Spacer(modifier = Modifier.width(32.dp))
 
-                                    IconButton(
-                                        onClick = { viewModel.fastForward() }
+                                    TvPlayerIconButton(
+                                        onClick = { viewModel.fastForward() },
+                                        focusRequester = fastForwardFocusRequester,
+                                        modifier = Modifier.focusProperties {
+                                            up = settingsFocusRequester
+                                            left = playPauseFocusRequester
+                                        }
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.FastForward,
