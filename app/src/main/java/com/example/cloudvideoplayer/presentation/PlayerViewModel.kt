@@ -95,6 +95,14 @@ class PlayerViewModel @Inject constructor(
         vlcPlayerManager.prepareAndPlay(cachedStreamUrl, cachedSubtitles, startPositionMs)
     }
 
+    fun fastForward() {
+        vlcPlayerManager.fastForward()
+    }
+
+    fun rewind() {
+        vlcPlayerManager.rewind()
+    }
+
     fun saveProgress() {
         val position = vlcPlayerManager.currentPosition.value
         val duration = vlcPlayerManager.duration.value

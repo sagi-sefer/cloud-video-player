@@ -25,10 +25,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
@@ -276,6 +279,18 @@ fun PlayerScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     IconButton(
+                                        onClick = { viewModel.rewind() }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.FastRewind,
+                                            contentDescription = "Rewind 10 seconds",
+                                            tint = Color.White
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(32.dp))
+
+                                    IconButton(
                                         onClick = {
                                             if (isPlaying) {
                                                 viewModel.vlcPlayerManager.pause()
@@ -287,6 +302,18 @@ fun PlayerScreen(
                                         Icon(
                                             imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                             contentDescription = if (isPlaying) "Pause" else "Play",
+                                            tint = Color.White
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(32.dp))
+
+                                    IconButton(
+                                        onClick = { viewModel.fastForward() }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.FastForward,
+                                            contentDescription = "Fast Forward 10 seconds",
                                             tint = Color.White
                                         )
                                     }

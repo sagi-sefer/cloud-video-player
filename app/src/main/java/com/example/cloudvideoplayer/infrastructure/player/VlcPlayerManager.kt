@@ -99,6 +99,18 @@ class VlcPlayerManager @Inject constructor(
         mediaPlayer.time = positionMs
     }
 
+    fun fastForward(offsetMs: Long = 10000L) {
+        val newTime = (mediaPlayer.time + offsetMs).coerceAtMost(mediaPlayer.length)
+        mediaPlayer.time = newTime
+        _currentPosition.value = newTime
+    }
+
+    fun rewind(offsetMs: Long = 10000L) {
+        val newTime = (mediaPlayer.time - offsetMs).coerceAtLeast(0L)
+        mediaPlayer.time = newTime
+        _currentPosition.value = newTime
+    }
+
     fun getAudioTracksInfo(): List<VlcTrackInfo> {
         val tracks = mediaPlayer.audioTracks ?: return emptyList()
         val currentId = mediaPlayer.audioTrack
