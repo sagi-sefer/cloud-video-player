@@ -111,6 +111,7 @@ class MainActivity : ComponentActivity() {
                             VideoDetailScreen(
                                 videoName = screen.videoItem.name,
                                 videoPath = screen.videoItem.path,
+                                thumbnailUrl = screen.videoItem.thumbnailUrl,
                                 onBackClick = {
                                     currentScreen = Screen.Library
                                 },
