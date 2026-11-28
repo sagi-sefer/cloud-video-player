@@ -113,47 +113,53 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                 val injectAntiCookieScript = { view: WebView? ->
                                     view?.evaluateJavascript("""
                                         (function() {
-                                            function purgeCookieBanner() {
-                                                var buttons = document.querySelectorAll('button, div[role="button"], a, span');
-                                                for (var i = 0; i < buttons.length; i++) {
-                                                    var text = (buttons[i].innerText || buttons[i].textContent || '').trim().toLowerCase();
-                                                    if (text === 'accept all' || text === 'accept' || text === 'accept cookies') {
-                                                        try {
-                                                            buttons[i].click();
-                                                        } catch(e) {}
-                                                    }
+                                            try {
+                                                function purgeCookieBanner() {
+                                                    try {
+                                                        var allButtons = document.getElementsByTagName('button');
+                                                        for (var i = 0; i < allButtons.length; i++) {
+                                                            var txt = (allButtons[i].innerText || allButtons[i].textContent || '').trim().toLowerCase();
+                                                            if (txt === 'accept all' || txt === 'accept' || txt === 'accept cookies' || txt === 'i agree') {
+                                                                allButtons[i].click();
+                                                            }
+                                                        }
+
+                                                        var roleButtons = document.querySelectorAll('div[role="button"], a, span');
+                                                        for (var k = 0; k < roleButtons.length; k++) {
+                                                            var t = (roleButtons[k].innerText || roleButtons[k].textContent || '').trim().toLowerCase();
+                                                            if (t === 'accept all' || t === 'accept') {
+                                                                roleButtons[k].click();
+                                                            }
+                                                        }
+
+                                                        var elements = document.querySelectorAll('div, section, aside, form, dialog');
+                                                        for (var j = 0; j < elements.length; j++) {
+                                                            var el = elements[j];
+                                                            if (el && el.innerText && (el.innerText.indexOf('We use cookies') !== -1 || el.innerText.indexOf('Customize cookies') !== -1)) {
+                                                                el.style.setProperty('display', 'none', 'important');
+                                                                el.style.setProperty('visibility', 'hidden', 'important');
+                                                                el.style.setProperty('opacity', '0', 'important');
+                                                                el.style.setProperty('pointer-events', 'none', 'important');
+                                                            }
+                                                        }
+                                                    } catch(e) {}
                                                 }
 
-                                                var allDivs = document.querySelectorAll('div, section, aside');
-                                                for (var j = 0; j < allDivs.length; j++) {
-                                                    var div = allDivs[j];
-                                                    if (div.innerText && (div.innerText.includes('We use cookies') || div.innerText.includes('Customize cookies'))) {
-                                                        div.style.setProperty('display', 'none', 'important');
-                                                        div.style.setProperty('visibility', 'hidden', 'important');
-                                                        div.style.setProperty('opacity', '0', 'important');
-                                                        div.style.setProperty('pointer-events', 'none', 'important');
-                                                    }
-                                                }
-                                            }
+                                                purgeCookieBanner();
 
-                                            purgeCookieBanner();
-
-                                            if (!window.__cookieObserverSet) {
-                                                window.__cookieObserverSet = true;
-                                                var count = 0;
-                                                var interval = setInterval(function() {
+                                                var intervalId = setInterval(function() {
                                                     purgeCookieBanner();
-                                                    count++;
-                                                    if (count > 50) clearInterval(interval);
                                                 }, 200);
+                                                setTimeout(function() { clearInterval(intervalId); }, 10000);
 
-                                                if (window.MutationObserver) {
+                                                var targetNode = document.body || document.documentElement;
+                                                if (targetNode && window.MutationObserver) {
                                                     var observer = new MutationObserver(function() {
                                                         purgeCookieBanner();
                                                     });
-                                                    observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+                                                    observer.observe(targetNode, { childList: true, subtree: true });
                                                 }
-                                            }
+                                            } catch(err) {}
                                         })();
                                     """.trimIndent(), null)
                                 }
@@ -161,7 +167,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                 webChromeClient = object : android.webkit.WebChromeClient() {
                                     override fun onProgressChanged(view: WebView?, newProgress: Int) {
                                         super.onProgressChanged(view, newProgress)
-                                        if (newProgress > 20) {
+                                        if (newProgress > 10) {
                                             injectAntiCookieScript(view)
                                         }
                                     }
