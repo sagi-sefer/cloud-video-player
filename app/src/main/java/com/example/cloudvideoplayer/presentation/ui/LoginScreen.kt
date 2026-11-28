@@ -1,6 +1,7 @@
 package com.example.cloudvideoplayer.presentation.ui
 
 import android.net.Uri
+import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -105,66 +106,72 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                             WebView(ctx).apply {
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
+
+                                CookieManager.getInstance().setAcceptCookie(true)
+                                CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+
+                                val injectAntiCookieCSS = { view: WebView? ->
+                                    view?.evaluateJavascript("""
+                                        (function() {
+                                            if (!document.getElementById('anti-cookie-style')) {
+                                                var style = document.createElement('style');
+                                                style.id = 'anti-cookie-style';
+                                                style.innerHTML = ' #onetrust-banner-sdk, #onetrust-consent-sdk, .onetrust-pc-dark-filter, [id*="onetrust"], [class*="onetrust"], [id*="cookie"], [class*="cookie"], [id*="consent"], [class*="consent"] { display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; height: 0px !important; width: 0px !important; } ';
+                                                (document.head || document.documentElement).appendChild(style);
+                                            }
+                                            function acceptCookies() {
+                                                var selectors = [
+                                                    '#onetrust-accept-btn-handler',
+                                                    'button[id*="accept"]',
+                                                    'button[class*="accept"]',
+                                                    'button[id*="cookie"]',
+                                                    '[aria-label*="accept" i]',
+                                                    '[aria-label*="cookie" i]'
+                                                ];
+                                                for (var i = 0; i < selectors.length; i++) {
+                                                    var el = document.querySelector(selectors[i]);
+                                                    if (el) {
+                                                        el.click();
+                                                        return true;
+                                                    }
+                                                }
+                                                var buttons = document.querySelectorAll('button, a, div[role="button"]');
+                                                for (var i = 0; i < buttons.length; i++) {
+                                                    var text = buttons[i].innerText.toLowerCase();
+                                                    if (text.includes('accept all') || text.includes('allow all') || text.includes('accept cookies') || text.includes('i agree') || text.includes('agree')) {
+                                                        buttons[i].click();
+                                                        return true;
+                                                    }
+                                                }
+                                                return false;
+                                            }
+                                            acceptCookies();
+                                        })();
+                                    """.trimIndent(), null)
+                                }
+
                                 webViewClient = object : WebViewClient() {
+                                    override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                                        super.onPageStarted(view, url, favicon)
+                                        injectAntiCookieCSS(view)
+                                    }
+
                                     override fun onPageFinished(view: WebView?, url: String?) {
                                         super.onPageFinished(view, url)
-                                        // Aggressive cookie banner auto-accept and removal script for TV
-                                        view?.evaluateJavascript("""
-                                            (function() {
-                                                function acceptCookies() {
-                                                    var selectors = [
-                                                        '#onetrust-accept-btn-handler',
-                                                        'button[id*="accept"]',
-                                                        'button[class*="accept"]',
-                                                        'button[id*="cookie"]',
-                                                        '[aria-label*="accept" i]',
-                                                        '[aria-label*="cookie" i]'
-                                                    ];
-                                                    for (var i = 0; i < selectors.length; i++) {
-                                                        var el = document.querySelector(selectors[i]);
-                                                        if (el) {
-                                                            el.click();
-                                                            return true;
-                                                        }
-                                                    }
-                                                    var buttons = document.querySelectorAll('button, a, div[role="button"]');
-                                                    for (var i = 0; i < buttons.length; i++) {
-                                                        var text = buttons[i].innerText.toLowerCase();
-                                                        if (text.includes('accept all') || text.includes('allow all') || text.includes('accept cookies') || text.includes('i agree') || text.includes('agree')) {
-                                                            buttons[i].click();
-                                                            return true;
-                                                        }
-                                                    }
-                                                    var banners = document.querySelectorAll('[id*="cookie"], [class*="cookie"], [id*="onetrust"], [class*="onetrust"], [id*="consent"], [class*="consent"]');
-                                                    for (var i = 0; i < banners.length; i++) {
-                                                        if (banners[i].offsetHeight > 50) {
-                                                            banners[i].style.display = 'none';
-                                                            banners[i].style.visibility = 'hidden';
-                                                        }
-                                                    }
-                                                    return false;
-                                                }
-                                                if (!acceptCookies()) {
-                                                    var attempts = 0;
-                                                    var timer = setInterval(function() {
-                                                        attempts++;
-                                                        if (acceptCookies() || attempts > 20) {
-                                                            clearInterval(timer);
-                                                        }
-                                                    }, 300);
-                                                }
-                                            })();
-                                        """.trimIndent(), null)
+                                        injectAntiCookieCSS(view)
                                     }
+
                                     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                                         val url = request?.url?.toString() ?: return false
                                         return handleRedirect(url)
                                     }
+
                                     @Suppress("DEPRECATION")
                                     override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
                                         if (url == null) return false
                                         return handleRedirect(url)
                                     }
+
                                     private fun handleRedirect(url: String): Boolean {
                                         if (url.contains("cloudvideoplayer://oauth") || url.contains("access_token=")) {
                                             val uri = Uri.parse(url)
