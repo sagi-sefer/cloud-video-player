@@ -151,7 +151,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                                 var currentIndex = -1;
 
                                                 function getFocusables() {
-                                                    return Array.from(document.querySelectorAll('input:not([type="hidden"]), button, a, div[role="button"], [tabindex="0"]'))
+                                                    var selector = 'input:not([type="hidden"]), button, a, div[role="button"], [tabindex="0"], iframe, div[class*="google" i], button[class*="google" i], div[id*="google" i]';
+                                                    return Array.from(document.querySelectorAll(selector))
                                                                 .filter(function(el) { return el.offsetWidth > 0 && el.offsetHeight > 0 && window.getComputedStyle(el).display !== 'none'; });
                                                 }
 
@@ -166,7 +167,9 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                                     currentIndex = index;
                                                     var target = focusables[currentIndex];
                                                     target.classList.add('tv-focused');
-                                                    target.focus();
+                                                    try {
+                                                        target.focus();
+                                                    } catch(err) {}
                                                     target.scrollIntoView({ block: 'center', behavior: 'smooth' });
                                                 }
 
@@ -185,6 +188,10 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                                             var el = focusables[currentIndex];
                                                             if (el.tagName !== 'INPUT') {
                                                                 el.click();
+                                                                try {
+                                                                    var ev = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+                                                                    el.dispatchEvent(ev);
+                                                                } catch(err) {}
                                                             }
                                                         }
                                                     }
