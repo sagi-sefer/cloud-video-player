@@ -106,6 +106,21 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
                                 webViewClient = object : WebViewClient() {
+                                    override fun onPageFinished(view: WebView?, url: String?) {
+                                        super.onPageFinished(view, url)
+                                        // Auto-accept cookie consent banners (OneTrust / Dropbox cookie banners)
+                                        view?.evaluateJavascript("""
+                                            (function() {
+                                                var btn = document.getElementById('onetrust-accept-btn-handler') ||
+                                                          document.querySelector('button[id*="accept"]') ||
+                                                          document.querySelector('button[class*="accept"]');
+                                                if (btn) { btn.click(); }
+                                                var banner = document.getElementById('onetrust-banner-sdk') ||
+                                                             document.querySelector('[class*="cookie"]');
+                                                if (banner) { banner.style.display = 'none'; }
+                                            })();
+                                        """.trimIndent(), null)
+                                    }
                                     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                                         val url = request?.url?.toString() ?: return false
                                         return handleRedirect(url)
