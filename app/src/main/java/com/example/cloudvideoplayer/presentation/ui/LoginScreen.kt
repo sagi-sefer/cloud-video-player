@@ -2,6 +2,7 @@ package com.example.cloudvideoplayer.presentation.ui
 
 import android.content.Intent
 import android.net.Uri
+import android.view.KeyEvent as AndroidKeyEvent
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -124,52 +125,106 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
                                 settings.setNeedInitialFocus(true)
+                                isFocusable = true
+                                isFocusableInTouchMode = true
+
                                 // Desktop user agent prevents Dropbox mobile one-tap cookie overlays
                                 settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
                                 CookieManager.getInstance().setAcceptCookie(true)
                                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
-                                val injectAntiCookieScript = { view: WebView? ->
+                                val injectTvSpatialNavAndAntiCookie = { view: WebView? ->
                                     view?.evaluateJavascript("""
                                         (function() {
-                                            function purge(root) {
-                                                if (!root) return;
-                                                try {
-                                                    var elems = root.querySelectorAll('*');
-                                                    for (var i = 0; i < elems.length; i++) {
-                                                        var el = elems[i];
-                                                        if (el.shadowRoot) purge(el.shadowRoot);
-                                                        if (el.tagName === 'IFRAME') {
-                                                            try { purge(el.contentDocument || el.contentWindow.document); } catch(e){}
-                                                        }
-                                                        var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-                                                        if (txt === 'accept all' || txt === 'accept' || txt === 'accept cookies') {
-                                                            try { el.click(); } catch(e){}
-                                                        }
-                                                        if (el.innerText && (el.innerText.indexOf('We use cookies') !== -1 || el.innerText.indexOf('Customize cookies') !== -1)) {
-                                                            el.style.setProperty('display', 'none', 'important');
-                                                            el.style.setProperty('visibility', 'hidden', 'important');
-                                                            el.style.setProperty('opacity', '0', 'important');
+                                            try {
+                                                if (!document.getElementById('tv-anti-cookie-css')) {
+                                                    var style = document.createElement('style');
+                                                    style.id = 'tv-anti-cookie-css';
+                                                    style.innerHTML = ' [id*="cookie" i], [class*="cookie" i], [id*="onetrust" i], [class*="onetrust" i], [id*="consent" i], [class*="consent" i], .onetrust-pc-dark-filter, div[role="dialog"] { display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; height: 0px !important; width: 0px !important; } input, button, a { outline-offset: 3px !important; } .tv-focused { outline: 4px solid #00E5FF !important; background-color: rgba(0,229,255,0.2) !important; transform: scale(1.03) !important; transition: all 0.15s ease !important; } ';
+                                                    (document.head || document.documentElement).appendChild(style);
+                                                }
+                                            } catch(e) {}
+
+                                            if (!window.__tvFocusManagerInjected) {
+                                                window.__tvFocusManagerInjected = true;
+                                                var currentIndex = -1;
+
+                                                function getFocusables() {
+                                                    return Array.from(document.querySelectorAll('input:not([type="hidden"]), button, a, div[role="button"], [tabindex="0"]'))
+                                                                .filter(function(el) { return el.offsetWidth > 0 && el.offsetHeight > 0 && window.getComputedStyle(el).display !== 'none'; });
+                                                }
+
+                                                function setFocus(index) {
+                                                    var focusables = getFocusables();
+                                                    if (focusables.length === 0) return;
+                                                    if (currentIndex >= 0 && currentIndex < focusables.length) {
+                                                        focusables[currentIndex].classList.remove('tv-focused');
+                                                    }
+                                                    if (index < 0) index = 0;
+                                                    if (index >= focusables.length) index = focusables.length - 1;
+                                                    currentIndex = index;
+                                                    var target = focusables[currentIndex];
+                                                    target.classList.add('tv-focused');
+                                                    target.focus();
+                                                    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                                                }
+
+                                                window.addEventListener('keydown', function(e) {
+                                                    var focusables = getFocusables();
+                                                    if (focusables.length === 0) return;
+
+                                                    if (e.key === 'ArrowDown') {
+                                                        e.preventDefault();
+                                                        setFocus(currentIndex + 1);
+                                                    } else if (e.key === 'ArrowUp') {
+                                                        e.preventDefault();
+                                                        setFocus(currentIndex - 1);
+                                                    } else if (e.key === 'Enter' || e.key === ' ') {
+                                                        if (currentIndex >= 0 && currentIndex < focusables.length) {
+                                                            var el = focusables[currentIndex];
+                                                            if (el.tagName !== 'INPUT') {
+                                                                el.click();
+                                                            }
                                                         }
                                                     }
-                                                } catch(e){}
-                                            }
+                                                }, true);
 
-                                            purge(document);
-                                            if (!window.__cookieInterval) {
-                                                window.__cookieInterval = setInterval(function() { purge(document); }, 200);
-                                                setTimeout(function() { clearInterval(window.__cookieInterval); }, 10000);
+                                                setTimeout(function() {
+                                                    setFocus(0);
+                                                }, 1000);
                                             }
                                         })();
                                     """.trimIndent(), null)
+                                }
+
+                                setOnKeyListener { _, keyCode, event ->
+                                    if (event.action == AndroidKeyEvent.ACTION_DOWN) {
+                                        when (keyCode) {
+                                            AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
+                                                evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown'}));", null)
+                                                true
+                                            }
+                                            AndroidKeyEvent.KEYCODE_DPAD_UP -> {
+                                                evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp'}));", null)
+                                                true
+                                            }
+                                            AndroidKeyEvent.KEYCODE_DPAD_CENTER, AndroidKeyEvent.KEYCODE_ENTER, AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                                                evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}));", null)
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    } else {
+                                        false
+                                    }
                                 }
 
                                 webChromeClient = object : android.webkit.WebChromeClient() {
                                     override fun onProgressChanged(view: WebView?, newProgress: Int) {
                                         super.onProgressChanged(view, newProgress)
                                         if (newProgress > 10) {
-                                            injectAntiCookieScript(view)
+                                            injectTvSpatialNavAndAntiCookie(view)
                                         }
                                     }
                                 }
@@ -177,12 +232,12 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                 webViewClient = object : WebViewClient() {
                                     override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                                         super.onPageStarted(view, url, favicon)
-                                        injectAntiCookieScript(view)
+                                        injectTvSpatialNavAndAntiCookie(view)
                                     }
 
                                     override fun onPageFinished(view: WebView?, url: String?) {
                                         super.onPageFinished(view, url)
-                                        injectAntiCookieScript(view)
+                                        injectTvSpatialNavAndAntiCookie(view)
                                     }
 
                                     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
