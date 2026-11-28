@@ -1,5 +1,6 @@
 package com.example.cloudvideoplayer.presentation.ui
 
+import android.content.Intent
 import android.net.Uri
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
@@ -8,6 +9,7 @@ import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,6 +43,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         context.getSharedPreferences("cloud_video_prefs", android.content.Context.MODE_PRIVATE)
     }
 
+    val authUrl = "https://www.dropbox.com/oauth2/authorize?client_id=$appKey&response_type=token&redirect_uri=cloudvideoplayer://oauth&scope=files.metadata.read%20files.content.read"
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -60,14 +65,26 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(32.dp))
-        Button(
-            onClick = {
-                showWebViewLogin = true
+
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(
+                onClick = {
+                    showWebViewLogin = true
+                }
+            ) {
+                Text("Login with Dropbox (In-App)")
             }
-        ) {
-            Text("Login with Dropbox (In-App)")
+            OutlinedButton(
+                onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(authUrl))
+                    context.startActivity(intent)
+                }
+            ) {
+                Text("Open in Browser")
+            }
         }
-        Spacer(modifier = Modifier.height(16.dp))
+
+        Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = "Or enter Dropbox Access Token manually:",
             style = MaterialTheme.typography.bodyMedium,
@@ -100,12 +117,15 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             onDismissRequest = { showWebViewLogin = false },
             title = { Text("Dropbox Sign-In") },
             text = {
-                Box(modifier = Modifier.fillMaxWidth().height(450.dp)) {
+                Box(modifier = Modifier.fillMaxWidth().height(480.dp)) {
                     AndroidView(
                         factory = { ctx ->
                             WebView(ctx).apply {
                                 settings.javaScriptEnabled = true
                                 settings.domStorageEnabled = true
+                                settings.setNeedInitialFocus(true)
+                                // Desktop user agent prevents Dropbox mobile one-tap cookie overlays
+                                settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
                                 CookieManager.getInstance().setAcceptCookie(true)
                                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
@@ -113,53 +133,34 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                 val injectAntiCookieScript = { view: WebView? ->
                                     view?.evaluateJavascript("""
                                         (function() {
-                                            try {
-                                                function purgeCookieBanner() {
-                                                    try {
-                                                        var allButtons = document.getElementsByTagName('button');
-                                                        for (var i = 0; i < allButtons.length; i++) {
-                                                            var txt = (allButtons[i].innerText || allButtons[i].textContent || '').trim().toLowerCase();
-                                                            if (txt === 'accept all' || txt === 'accept' || txt === 'accept cookies' || txt === 'i agree') {
-                                                                allButtons[i].click();
-                                                            }
+                                            function purge(root) {
+                                                if (!root) return;
+                                                try {
+                                                    var elems = root.querySelectorAll('*');
+                                                    for (var i = 0; i < elems.length; i++) {
+                                                        var el = elems[i];
+                                                        if (el.shadowRoot) purge(el.shadowRoot);
+                                                        if (el.tagName === 'IFRAME') {
+                                                            try { purge(el.contentDocument || el.contentWindow.document); } catch(e){}
                                                         }
-
-                                                        var roleButtons = document.querySelectorAll('div[role="button"], a, span');
-                                                        for (var k = 0; k < roleButtons.length; k++) {
-                                                            var t = (roleButtons[k].innerText || roleButtons[k].textContent || '').trim().toLowerCase();
-                                                            if (t === 'accept all' || t === 'accept') {
-                                                                roleButtons[k].click();
-                                                            }
+                                                        var txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+                                                        if (txt === 'accept all' || txt === 'accept' || txt === 'accept cookies') {
+                                                            try { el.click(); } catch(e){}
                                                         }
-
-                                                        var elements = document.querySelectorAll('div, section, aside, form, dialog');
-                                                        for (var j = 0; j < elements.length; j++) {
-                                                            var el = elements[j];
-                                                            if (el && el.innerText && (el.innerText.indexOf('We use cookies') !== -1 || el.innerText.indexOf('Customize cookies') !== -1)) {
-                                                                el.style.setProperty('display', 'none', 'important');
-                                                                el.style.setProperty('visibility', 'hidden', 'important');
-                                                                el.style.setProperty('opacity', '0', 'important');
-                                                                el.style.setProperty('pointer-events', 'none', 'important');
-                                                            }
+                                                        if (el.innerText && (el.innerText.indexOf('We use cookies') !== -1 || el.innerText.indexOf('Customize cookies') !== -1)) {
+                                                            el.style.setProperty('display', 'none', 'important');
+                                                            el.style.setProperty('visibility', 'hidden', 'important');
+                                                            el.style.setProperty('opacity', '0', 'important');
                                                         }
-                                                    } catch(e) {}
-                                                }
+                                                    }
+                                                } catch(e){}
+                                            }
 
-                                                purgeCookieBanner();
-
-                                                var intervalId = setInterval(function() {
-                                                    purgeCookieBanner();
-                                                }, 200);
-                                                setTimeout(function() { clearInterval(intervalId); }, 10000);
-
-                                                var targetNode = document.body || document.documentElement;
-                                                if (targetNode && window.MutationObserver) {
-                                                    var observer = new MutationObserver(function() {
-                                                        purgeCookieBanner();
-                                                    });
-                                                    observer.observe(targetNode, { childList: true, subtree: true });
-                                                }
-                                            } catch(err) {}
+                                            purge(document);
+                                            if (!window.__cookieInterval) {
+                                                window.__cookieInterval = setInterval(function() { purge(document); }, 200);
+                                                setTimeout(function() { clearInterval(window.__cookieInterval); }, 10000);
+                                            }
                                         })();
                                     """.trimIndent(), null)
                                 }
@@ -221,7 +222,6 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                         return false
                                     }
                                 }
-                                val authUrl = "https://www.dropbox.com/oauth2/authorize?client_id=$appKey&response_type=token&redirect_uri=cloudvideoplayer://oauth&scope=files.metadata.read%20files.content.read"
                                 loadUrl(authUrl)
                             }
                         },
