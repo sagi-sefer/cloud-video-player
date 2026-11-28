@@ -18,8 +18,8 @@ android {
         applicationId = "com.example.cloudvideoplayer"
         minSdk = 26
         targetSdk = 35
-        versionCode = 100
-        versionName = "1.0.0"
+        versionCode = (System.currentTimeMillis() / 1000).toInt()
+        versionName = "1.0.${System.currentTimeMillis() / 1000}"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
