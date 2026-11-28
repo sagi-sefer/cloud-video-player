@@ -108,16 +108,51 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                 webViewClient = object : WebViewClient() {
                                     override fun onPageFinished(view: WebView?, url: String?) {
                                         super.onPageFinished(view, url)
-                                        // Auto-accept cookie consent banners (OneTrust / Dropbox cookie banners)
+                                        // Aggressive cookie banner auto-accept and removal script for TV
                                         view?.evaluateJavascript("""
                                             (function() {
-                                                var btn = document.getElementById('onetrust-accept-btn-handler') ||
-                                                          document.querySelector('button[id*="accept"]') ||
-                                                          document.querySelector('button[class*="accept"]');
-                                                if (btn) { btn.click(); }
-                                                var banner = document.getElementById('onetrust-banner-sdk') ||
-                                                             document.querySelector('[class*="cookie"]');
-                                                if (banner) { banner.style.display = 'none'; }
+                                                function acceptCookies() {
+                                                    var selectors = [
+                                                        '#onetrust-accept-btn-handler',
+                                                        'button[id*="accept"]',
+                                                        'button[class*="accept"]',
+                                                        'button[id*="cookie"]',
+                                                        '[aria-label*="accept" i]',
+                                                        '[aria-label*="cookie" i]'
+                                                    ];
+                                                    for (var i = 0; i < selectors.length; i++) {
+                                                        var el = document.querySelector(selectors[i]);
+                                                        if (el) {
+                                                            el.click();
+                                                            return true;
+                                                        }
+                                                    }
+                                                    var buttons = document.querySelectorAll('button, a, div[role="button"]');
+                                                    for (var i = 0; i < buttons.length; i++) {
+                                                        var text = buttons[i].innerText.toLowerCase();
+                                                        if (text.includes('accept all') || text.includes('allow all') || text.includes('accept cookies') || text.includes('i agree') || text.includes('agree')) {
+                                                            buttons[i].click();
+                                                            return true;
+                                                        }
+                                                    }
+                                                    var banners = document.querySelectorAll('[id*="cookie"], [class*="cookie"], [id*="onetrust"], [class*="onetrust"], [id*="consent"], [class*="consent"]');
+                                                    for (var i = 0; i < banners.length; i++) {
+                                                        if (banners[i].offsetHeight > 50) {
+                                                            banners[i].style.display = 'none';
+                                                            banners[i].style.visibility = 'hidden';
+                                                        }
+                                                    }
+                                                    return false;
+                                                }
+                                                if (!acceptCookies()) {
+                                                    var attempts = 0;
+                                                    var timer = setInterval(function() {
+                                                        attempts++;
+                                                        if (acceptCookies() || attempts > 20) {
+                                                            clearInterval(timer);
+                                                        }
+                                                    }, 300);
+                                                }
                                             })();
                                         """.trimIndent(), null)
                                     }
