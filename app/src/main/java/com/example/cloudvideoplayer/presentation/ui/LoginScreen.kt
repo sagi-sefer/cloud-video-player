@@ -169,6 +169,9 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                                     target.classList.add('tv-focused');
                                                     try {
                                                         target.focus();
+                                                        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+                                                            target.click();
+                                                        }
                                                     } catch(err) {}
                                                     target.scrollIntoView({ block: 'center', behavior: 'smooth' });
                                                 }
@@ -177,22 +180,24 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                                     var focusables = getFocusables();
                                                     if (focusables.length === 0) return;
 
-                                                    if (e.key === 'ArrowDown') {
+                                                    var active = document.activeElement;
+                                                    var isTypingInInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+
+                                                    if (e.key === 'ArrowDown' && !isTypingInInput) {
                                                         e.preventDefault();
                                                         setFocus(currentIndex + 1);
-                                                    } else if (e.key === 'ArrowUp') {
+                                                    } else if (e.key === 'ArrowUp' && !isTypingInInput) {
                                                         e.preventDefault();
                                                         setFocus(currentIndex - 1);
                                                     } else if (e.key === 'Enter' || e.key === ' ') {
                                                         if (currentIndex >= 0 && currentIndex < focusables.length) {
                                                             var el = focusables[currentIndex];
-                                                            if (el.tagName !== 'INPUT') {
+                                                            try {
+                                                                el.focus();
                                                                 el.click();
-                                                                try {
-                                                                    var ev = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
-                                                                    el.dispatchEvent(ev);
-                                                                } catch(err) {}
-                                                            }
+                                                                var ev = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+                                                                el.dispatchEvent(ev);
+                                                            } catch(err) {}
                                                         }
                                                     }
                                                 }, true);
@@ -209,16 +214,16 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                     if (event.action == AndroidKeyEvent.ACTION_DOWN) {
                                         when (keyCode) {
                                             AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
-                                                evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown'}));", null)
-                                                true
+                                                evaluateJavascript("if (!document.activeElement || (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA')) { window.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown'})); }", null)
+                                                false
                                             }
                                             AndroidKeyEvent.KEYCODE_DPAD_UP -> {
-                                                evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp'}));", null)
-                                                true
+                                                evaluateJavascript("if (!document.activeElement || (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA')) { window.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp'})); }", null)
+                                                false
                                             }
                                             AndroidKeyEvent.KEYCODE_DPAD_CENTER, AndroidKeyEvent.KEYCODE_ENTER, AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
                                                 evaluateJavascript("window.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}));", null)
-                                                true
+                                                false
                                             }
                                             else -> false
                                         }
