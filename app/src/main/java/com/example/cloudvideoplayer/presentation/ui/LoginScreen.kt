@@ -110,55 +110,72 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                 CookieManager.getInstance().setAcceptCookie(true)
                                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
-                                val injectAntiCookieCSS = { view: WebView? ->
+                                val injectAntiCookieScript = { view: WebView? ->
                                     view?.evaluateJavascript("""
                                         (function() {
-                                            if (!document.getElementById('anti-cookie-style')) {
-                                                var style = document.createElement('style');
-                                                style.id = 'anti-cookie-style';
-                                                style.innerHTML = ' #onetrust-banner-sdk, #onetrust-consent-sdk, .onetrust-pc-dark-filter, [id*="onetrust"], [class*="onetrust"], [id*="cookie"], [class*="cookie"], [id*="consent"], [class*="consent"] { display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; height: 0px !important; width: 0px !important; } ';
-                                                (document.head || document.documentElement).appendChild(style);
-                                            }
-                                            function acceptCookies() {
-                                                var selectors = [
-                                                    '#onetrust-accept-btn-handler',
-                                                    'button[id*="accept"]',
-                                                    'button[class*="accept"]',
-                                                    'button[id*="cookie"]',
-                                                    '[aria-label*="accept" i]',
-                                                    '[aria-label*="cookie" i]'
-                                                ];
-                                                for (var i = 0; i < selectors.length; i++) {
-                                                    var el = document.querySelector(selectors[i]);
-                                                    if (el) {
-                                                        el.click();
-                                                        return true;
-                                                    }
-                                                }
-                                                var buttons = document.querySelectorAll('button, a, div[role="button"]');
+                                            function purgeCookieBanner() {
+                                                var buttons = document.querySelectorAll('button, div[role="button"], a, span');
                                                 for (var i = 0; i < buttons.length; i++) {
-                                                    var text = buttons[i].innerText.toLowerCase();
-                                                    if (text.includes('accept all') || text.includes('allow all') || text.includes('accept cookies') || text.includes('i agree') || text.includes('agree')) {
-                                                        buttons[i].click();
-                                                        return true;
+                                                    var text = (buttons[i].innerText || buttons[i].textContent || '').trim().toLowerCase();
+                                                    if (text === 'accept all' || text === 'accept' || text === 'accept cookies') {
+                                                        try {
+                                                            buttons[i].click();
+                                                        } catch(e) {}
                                                     }
                                                 }
-                                                return false;
+
+                                                var allDivs = document.querySelectorAll('div, section, aside');
+                                                for (var j = 0; j < allDivs.length; j++) {
+                                                    var div = allDivs[j];
+                                                    if (div.innerText && (div.innerText.includes('We use cookies') || div.innerText.includes('Customize cookies'))) {
+                                                        div.style.setProperty('display', 'none', 'important');
+                                                        div.style.setProperty('visibility', 'hidden', 'important');
+                                                        div.style.setProperty('opacity', '0', 'important');
+                                                        div.style.setProperty('pointer-events', 'none', 'important');
+                                                    }
+                                                }
                                             }
-                                            acceptCookies();
+
+                                            purgeCookieBanner();
+
+                                            if (!window.__cookieObserverSet) {
+                                                window.__cookieObserverSet = true;
+                                                var count = 0;
+                                                var interval = setInterval(function() {
+                                                    purgeCookieBanner();
+                                                    count++;
+                                                    if (count > 50) clearInterval(interval);
+                                                }, 200);
+
+                                                if (window.MutationObserver) {
+                                                    var observer = new MutationObserver(function() {
+                                                        purgeCookieBanner();
+                                                    });
+                                                    observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+                                                }
+                                            }
                                         })();
                                     """.trimIndent(), null)
+                                }
+
+                                webChromeClient = object : android.webkit.WebChromeClient() {
+                                    override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                        super.onProgressChanged(view, newProgress)
+                                        if (newProgress > 20) {
+                                            injectAntiCookieScript(view)
+                                        }
+                                    }
                                 }
 
                                 webViewClient = object : WebViewClient() {
                                     override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                                         super.onPageStarted(view, url, favicon)
-                                        injectAntiCookieCSS(view)
+                                        injectAntiCookieScript(view)
                                     }
 
                                     override fun onPageFinished(view: WebView?, url: String?) {
                                         super.onPageFinished(view, url)
-                                        injectAntiCookieCSS(view)
+                                        injectAntiCookieScript(view)
                                     }
 
                                     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
